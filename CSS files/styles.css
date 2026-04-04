@@ -368,3 +368,46 @@ hr { border: none; height: 1px; background: rgba(255,255,255,0.1); margin: 60px 
     transform: translateY(-5px);
     box-shadow: 0 5px 15px rgba(229, 9, 20, 0.4);
 }
+
+/* --- HORIZONTAL SCROLLING ROWS --- */
+.movie-row-container {
+    margin-bottom: 50px;
+    position: relative;
+}
+
+.movie-row-container h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-left: 10px;
+    border-left: 4px solid var(--accent);
+}
+
+.movie-row {
+    display: flex;
+    gap: 20px;
+    overflow-x: auto;
+    padding-bottom: 20px; /* Room for hover effects */
+    padding-left: 5px;
+    scroll-behavior: smooth;
+    /* Snap scrolling makes it feel like a native app */
+    scroll-snap-type: x mandatory; 
+}
+
+/* Hide the ugly default scrollbar but keep functionality */
+.movie-row::-webkit-scrollbar {
+    display: none;
+}
+.movie-row {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.movie-row .movie-card {
+    min-width: 180px; 
+    max-width: 180px;
+    scroll-snap-align: start;
+}
