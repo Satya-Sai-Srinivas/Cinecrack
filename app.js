@@ -1,22 +1,74 @@
 // Ensure this matches your FastAPI server port
 const API_BASE_URL = "http://127.0.0.1:8000/api/v1/movies";
 
-// Global State
+// --- Global State ---
 let currentRegion = 'US';
 let currentLang = 'all';
+let currentCity = '';
+let detectedRegion = '';
+let detectedCity = '';
+
+// Pagination State
+let currentPage = 1;
+let isLoadingMore = false;
+let hasMoreData = true;
+let currentMode = 'now-playing'; // 'now-playing' or 'search'
+let currentSearchQuery = '';
+
+// --- Location Detection Logic ---
+async function initLocation() {
+    try {
+        const response = await fetch('https://ipapi.co/json/');
+        const data = await response.json();
+        
+        if (data.country_code) {
+            detectedRegion = data.country_code;
+            detectedCity = data.city || '';
+            
+            // Add the dynamic Local button
+            addLocalMarketButton(detectedRegion, detectedCity);
+            
+            // Default to local region immediately
+            currentRegion = detectedRegion;
+            currentCity = detectedCity;
+        }
+    } catch (error) {
+        console.error("Could not detect location. Falling back to US.", error);
+    }
+}
+
+function addLocalMarketButton(regionCode, city) {
+    const toggleContainer = document.querySelector('.market-toggle');
+    
+    const localBtn = document.createElement('button');
+    localBtn.className = 'market-btn';
+    localBtn.id = `btn-LOCAL`;
+    localBtn.textContent = city ? `📍 ${city}` : `📍 Local (${regionCode})`;
+    localBtn.onclick = () => switchMarket('LOCAL');
+    
+    // Insert it at the beginning
+    toggleContainer.prepend(localBtn);
+}
 
 // --- Switch Market Logic ---
-function switchMarket(region) {
-    if (currentRegion === region) return;
-    currentRegion = region;
+function switchMarket(target) {
+    // Determine underlying region and city based on selection
+    if (target === 'LOCAL') {
+        currentRegion = detectedRegion;
+        currentCity = detectedCity;
+    } else {
+        currentRegion = target;
+        currentCity = ''; // Clear city when manually picking US/IN
+    }
     
-    // Toggle main buttons
-    document.getElementById('btn-US').classList.toggle('active', region === 'US');
-    document.getElementById('btn-IN').classList.toggle('active', region === 'IN');
+    // Toggle main buttons classes
+    document.querySelectorAll('.market-btn').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.getElementById(`btn-${target}`);
+    if (activeBtn) activeBtn.classList.add('active');
     
     // Show/Hide Indian Language Filters
     const langFilters = document.getElementById('regional-filters');
-    if (region === 'IN') {
+    if (currentRegion === 'IN') {
         langFilters.style.display = 'flex';
     } else {
         langFilters.style.display = 'none';
@@ -28,19 +80,16 @@ function switchMarket(region) {
     loadNowPlaying();
 }
 
-
 // --- View Toggling & Scroll Fix ---
 function showHomeView() {
     document.getElementById('home-view').classList.remove('hidden');
     document.getElementById('detail-view').classList.add('hidden');
-    // Scroll to top when going back home
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'instant' }), 10);
 }
 
 function showDetailView() {
     document.getElementById('home-view').classList.add('hidden');
     document.getElementById('detail-view').classList.remove('hidden');
-    // FIXED: Force the browser to scroll to the top AFTER the DOM paints
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'instant' }), 10);
 }
 
@@ -72,36 +121,106 @@ function updateLangButtons() {
     });
 }
 
+// --- Dynamic Section Title ---
 function updateSectionTitle() {
     const sectionTitle = document.querySelector('.section-title');
     if (!sectionTitle) return;
     
-    if (currentRegion === 'US') {
+    if (currentCity) {
+        sectionTitle.textContent = `Now Playing in ${currentCity} Theaters`;
+    } else if (currentRegion === 'US') {
         sectionTitle.textContent = 'Now Playing in US Theaters';
-    } else {
+    } else if (currentRegion === 'IN') {
         const langNames = { 'all': 'Indian', 'te': 'Telugu', 'hi': 'Hindi', 'ta': 'Tamil', 'ml': 'Malayalam' };
         sectionTitle.textContent = `Now Playing in Theaters (${langNames[currentLang]})`;
+    } else {
+        sectionTitle.textContent = `Now Playing in Theaters (${currentRegion})`;
     }
 }
 
+// --- Infinite Scroll Logic ---
+window.addEventListener('scroll', () => {
+    // Prevent fetching if already loading, no more data, or not on the home screen
+    if (isLoadingMore || !hasMoreData || document.getElementById('home-view').classList.contains('hidden')) return;
 
-// --- Fetch & Render Now Playing (Default Homepage) ---
+    const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+    
+    // Trigger when user is within 200px of the bottom
+    if (scrollTop + clientHeight >= scrollHeight - 200) {
+        fetchNextBatch();
+    }
+});
+
+async function fetchNextBatch() {
+    isLoadingMore = true;
+    currentPage++;
+    
+    // Show bottom spinner
+    const bottomLoading = document.getElementById('bottom-loading');
+    if (bottomLoading) bottomLoading.classList.remove('hidden');
+
+    try {
+        let url = '';
+        if (currentMode === 'now-playing') {
+            url = `${API_BASE_URL}/now-playing?region=${currentRegion}&lang=${currentLang}&page=${currentPage}`;
+        } else {
+            url = `${API_BASE_URL}/search?query=${encodeURIComponent(currentSearchQuery)}&page=${currentPage}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to load more data");
+        
+        const movies = await response.json();
+        
+        // If API returns fewer than 20 items, we've reached the end
+        if (movies.length < 20) {
+            hasMoreData = false;
+        }
+
+        appendMoviesToGrid(movies);
+
+    } catch (error) {
+        console.error("Pagination error:", error);
+        currentPage--; // Revert page count so user can try again
+    } finally {
+        isLoadingMore = false;
+        if (bottomLoading) bottomLoading.classList.add('hidden');
+    }
+}
+
+function buildMovieCardHTML(movie) {
+    return `
+        <div class="movie-card" onclick="fetchAndShowMovie(${movie.id})">
+            <img src="${movie.poster_url || 'https://via.placeholder.com/500x750?text=No+Poster'}" alt="${movie.title}">
+            <div class="movie-card-title">${movie.title} <br> <span style="font-size: 0.8em; color: #ccc;">(${movie.release_date ? movie.release_date.substring(0,4) : 'N/A'})</span></div>
+        </div>
+    `;
+}
+
+function appendMoviesToGrid(movies) {
+    const grid = document.getElementById('now-playing-grid');
+    grid.insertAdjacentHTML('beforeend', movies.map(buildMovieCardHTML).join(''));
+}
+
+// --- Fetch & Render Now Playing ---
 async function loadNowPlaying() {
+    // Reset State
+    currentMode = 'now-playing';
+    currentPage = 1;
+    hasMoreData = true;
+
     showLoading(); 
     try {
-        // FIXED: Passes both region and language to the backend
-        const response = await fetch(`${API_BASE_URL}/now-playing?region=${currentRegion}&lang=${currentLang}`);
+        const response = await fetch(`${API_BASE_URL}/now-playing?region=${currentRegion}&lang=${currentLang}&page=${currentPage}`);
         if (!response.ok) throw new Error("Failed to load now playing");
         
         const movies = await response.json();
         const grid = document.getElementById('now-playing-grid');
         
-        grid.innerHTML = movies.map(movie => `
-            <div class="movie-card" onclick="fetchAndShowMovie(${movie.id})">
-                <img src="${movie.poster_url || 'https://via.placeholder.com/500x750?text=No+Poster'}" alt="${movie.title}">
-                <div class="movie-card-title">${movie.title} <br> <span style="font-size: 0.8em; color: #ccc;">(${movie.release_date ? movie.release_date.substring(0,4) : 'N/A'})</span></div>
-            </div>
-        `).join('');
+        if (movies.length < 20) hasMoreData = false;
+        
+        // Use innerHTML for the first load to clear any old content
+        grid.innerHTML = movies.map(buildMovieCardHTML).join('');
     } catch (error) {
         console.error("Error loading now playing:", error);
         document.getElementById('now-playing-grid').innerHTML = '<p style="color: white; padding: 20px;">Failed to load movies. Is the backend running?</p>';
@@ -115,8 +234,8 @@ function resetToHome() {
     const searchInput = document.getElementById('movie-search-input');
     if (searchInput) searchInput.value = '';
 
-    updateSectionTitle();
-    loadNowPlaying();
+    // If local was detected, reset to local, otherwise US
+    switchMarket(detectedRegion ? 'LOCAL' : 'US');
     showHomeView();
 }
 
@@ -160,13 +279,17 @@ async function loadHistory() {
 async function executeSearch() {
     const queryInput = document.getElementById('movie-search-input');
     const query = queryInput.value.trim();
-    
     if (!query) return;
 
-    showLoading();
+    // Reset State
+    currentMode = 'search';
+    currentSearchQuery = query;
+    currentPage = 1;
+    hasMoreData = true;
 
+    showLoading();
     try {
-        const response = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`);
+        const response = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}&page=${currentPage}`);
         if (!response.ok) throw new Error("Search failed");
         
         const movies = await response.json();
@@ -174,17 +297,13 @@ async function executeSearch() {
         
         document.querySelector('.section-title').textContent = `Search Results for "${query}"`;
         
+        if (movies.length < 20) hasMoreData = false;
+
         if (movies.length === 0) {
             grid.innerHTML = `<p style="color: white; padding: 20px;">No movies found for "${query}".</p>`;
         } else {
-            grid.innerHTML = movies.map(movie => `
-                <div class="movie-card" onclick="fetchAndShowMovie(${movie.id})">
-                    <img src="${movie.poster_url || 'https://via.placeholder.com/500x750?text=No+Poster'}" alt="${movie.title}">
-                    <div class="movie-card-title">${movie.title} <br> <span style="font-size: 0.8em; color: #ccc;">(${movie.release_date ? movie.release_date.substring(0,4) : 'N/A'})</span></div>
-                </div>
-            `).join('');
+            grid.innerHTML = movies.map(buildMovieCardHTML).join('');
         }
-
         showHomeView();
 
     } catch (error) {
@@ -246,7 +365,6 @@ function renderMovieDetails(movie) {
         ottContainer.textContent = "Not currently available to stream.";
     }
 
-    // FIXED: Now properly mapping the 'well_known_for' arrays for Lead Cast
     document.getElementById('cast-grid').innerHTML = movie.lead_cast.map(person => {
         const knownForText = person.well_known_for && person.well_known_for.length > 0 
             ? person.well_known_for.map(work => `${work.title} (${work.release_year || 'N/A'})`).join(', ')
@@ -264,7 +382,6 @@ function renderMovieDetails(movie) {
         `;
     }).join('');
 
-    // FIXED: Now properly mapping the 'well_known_for' arrays for Technicians
     document.getElementById('technician-grid').innerHTML = movie.technicians.map(person => {
         const knownForText = person.well_known_for && person.well_known_for.length > 0 
             ? person.well_known_for.map(work => `${work.title} (${work.release_year || 'N/A'})`).join(', ')
@@ -283,8 +400,24 @@ function renderMovieDetails(movie) {
     }).join('');
 }
 
-// --- App Initialization ---
-window.onload = () => {
-    loadNowPlaying();
-    loadHistory();
+// --- App Initialization (Updated) ---
+window.onload = async () => {
+    showLoading();
+    
+    // Detects user location and sets up local variables
+    await initLocation();
+    
+    // Set the proper active button state initially
+    if (detectedRegion) {
+        const localBtn = document.getElementById('btn-LOCAL');
+        if(localBtn) localBtn.classList.add('active');
+    } else {
+        const usBtn = document.getElementById('btn-US');
+        if(usBtn) usBtn.classList.add('active');
+    }
+    
+    updateSectionTitle();
+    await loadNowPlaying();
+    await loadHistory();
+    hideLoading();
 };

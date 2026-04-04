@@ -225,12 +225,10 @@ hr { border: none; height: 1px; background: rgba(255,255,255,0.1); margin: 60px 
     backdrop-filter: blur(5px); /* Adds a sleek blur effect to the background */
 }
 
-/* We use the same 'hidden' class you already use for views */
 #loading-overlay.hidden {
     display: none;
 }
 
-/* The actual spinning circle */
 .spinner {
     width: 60px;
     height: 60px;

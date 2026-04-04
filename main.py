@@ -74,16 +74,12 @@ def safe_parse_date(date_string: str) -> Optional[date]:
 async def fetch_person_data(client: httpx.AsyncClient, person: dict, is_cast: bool) -> Any:
     person_id = person["id"]
     
-    # FIXED: Clean URL with no question marks
     url = f"{BASE_URL}/person/{person_id}"
-    
-    # FIXED: All parameters safely bundled together
     params = {"append_to_response": "external_ids,movie_credits", **AUTH_PARAMS}
     
     response = await client.get(url, headers=HEADERS, params=params)
     
     if response.status_code != 200:
-        # If TMDb rejects the request, we will now see exactly why in the terminal!
         print(f"⚠️ TMDB ERROR for person {person_id}: {response.status_code} - {response.text}")
         data = {}
     else:
@@ -109,7 +105,6 @@ async def fetch_person_data(client: httpx.AsyncClient, person: dict, is_cast: bo
             release_year=year
         ))
         
-    # NEW: Terminal confirmation
     print(f"🎬 Fetched {len(well_known_for)} past works for {person.get('name', 'Unknown')}")
     
     image_url = f"https://image.tmdb.org/t/p/w500{person['profile_path']}" if person.get("profile_path") else None
@@ -128,42 +123,39 @@ class MoviePreview(BaseModel):
 
 # --- 4. API Endpoints ---
 @app.get("/api/v1/movies/now-playing", response_model=List[MoviePreview])
-async def get_now_playing(region: str = "US", lang: str = "all"):
-    """Fetches movies, with advanced filtering for specific regional industries."""
+async def get_now_playing(region: str = "US", lang: str = "all", page: int = 1):
+    """Fetches movies with pagination and advanced filtering."""
     
     if lang != "all":
-        # ⚡ ADVANCED: Use Discover API to force specific regional languages
         url = f"{BASE_URL}/discover/movie"
         today = datetime.utcnow()
-        past_month = today - timedelta(days=45) # Look at releases from the last 45 days
+        past_month = today - timedelta(days=45) 
         
         params = {
             "region": region,
-            "with_release_type": "2|3", # 2 = Limited Theatrical, 3 = Theatrical
+            "with_release_type": "2|3",
             "release_date.gte": past_month.strftime("%Y-%m-%d"),
             "release_date.lte": today.strftime("%Y-%m-%d"),
             "with_original_language": lang,
             "sort_by": "popularity.desc",
-            "page": 1,
+            "page": page, # Dynamically passed page
             **AUTH_PARAMS
         }
     else:
-        # 🐢 BASIC: Default Now Playing API
         url = f"{BASE_URL}/movie/now_playing"
-        params = {"region": region, "page": 1, **AUTH_PARAMS}
+        params = {"region": region, "page": page, **AUTH_PARAMS} # Dynamically passed page
     
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=HEADERS, params=params)
         
         if response.status_code != 200:
-            print(f"\n❌ TMDB API ERROR (Now Playing): {response.status_code} - {response.text}\n")
             raise HTTPException(status_code=response.status_code, detail=response.json())
             
         data = response.json()
         movies = []
         
-        # INCREASED from 12 to 20 to show more movies!
-        for item in data.get("results", [])[:20]:
+        # TMDb returns 20 results per page automatically
+        for item in data.get("results", []):
             poster = f"https://image.tmdb.org/t/p/w500{item['poster_path']}" if item.get('poster_path') else None
             movies.append(MoviePreview(
                 id=item["id"], 
@@ -174,22 +166,21 @@ async def get_now_playing(region: str = "US", lang: str = "all"):
         return movies
 
 @app.get("/api/v1/movies/search", response_model=List[MoviePreview])
-async def search_movies(query: str):
-    """Searches TMDb by movie name and returns a list of matches."""
+async def search_movies(query: str, page: int = 1):
+    """Searches TMDb by movie name with pagination."""
     url = f"{BASE_URL}/search/movie"
-    params = {"query": query, "include_adult": "false", "page": 1, **AUTH_PARAMS}
+    params = {"query": query, "include_adult": "false", "page": page, **AUTH_PARAMS}
     
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=HEADERS, params=params)
         
         if response.status_code != 200:
-            print(f"\n❌ TMDB API ERROR (Search): {response.status_code} - {response.text}\n")
             raise HTTPException(status_code=response.status_code, detail="Failed to search movies")
             
         data = response.json()
         movies = []
-        # Return the top 12 matches
-        for item in data.get("results", [])[:12]:
+        
+        for item in data.get("results", []):
             poster = f"https://image.tmdb.org/t/p/w500{item['poster_path']}" if item.get('poster_path') else None
             movies.append(MoviePreview(
                 id=item["id"], 
@@ -204,7 +195,6 @@ async def search_movies(query: str):
 async def get_movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
     """Fetches full details, using PostgreSQL to cache and track history."""
     
-    # 1. Check PostgreSQL Cache First
     result = await db.execute(select(MovieCache).where(MovieCache.movie_id == movie_id))
     cached_movie = result.scalars().first()
     
@@ -236,7 +226,6 @@ async def get_movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
             
             providers = movie_data.get("watch/providers", {}).get("results", {}).get("US", {})
             
-            # FIXED: Pydantic Validation Error for StreamingPlatform
             tmdb_url = f"https://www.themoviedb.org/movie/{movie_id}/watch"
             streaming_platforms = [
                 StreamingPlatform(name=p["provider_name"], link=tmdb_url) 
@@ -269,26 +258,21 @@ async def get_movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
                 technicians=list(validated_technicians)
             )
 
-            # Convert to dict for JSONB storage and frontend return
             final_response_data = final_response.model_dump(mode='json')
 
-            # Save to Cache
             new_cache_entry = MovieCache(
                 movie_id=movie_id,
                 movie_data=final_response_data
             )
             db.add(new_cache_entry)
 
-    # 3. Log to Search History (Runs for BOTH cached and fresh searches)
     new_history = SearchHistory(
         movie_id=movie_id, 
         movie_title=movie_title
     )
     db.add(new_history)
     
-    # Commit cache and history to the database
     await db.commit()
-    
     return final_response_data
 
 @app.get("/api/v1/history")

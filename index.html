@@ -17,7 +17,7 @@
         <div class="logo" onclick="resetToHome()" style="cursor: pointer;">🎬 CineCrack</div>
         
         <div class="market-toggle">
-            <button id="btn-US" class="market-btn active" onclick="switchMarket('US')">🇺🇸 US</button>
+            <button id="btn-US" class="market-btn" onclick="switchMarket('US')">🇺🇸 US</button>
             <button id="btn-IN" class="market-btn" onclick="switchMarket('IN')">🇮🇳 India</button>
         </div>
 
@@ -47,8 +47,12 @@
             </div>
 
             <h2 class="section-title">Now Playing in Theaters</h2>
-            <div class="grid-container" id="now-playing-grid">
-                </div>
+            <div class="grid-container" id="now-playing-grid"></div>
+
+            <div id="bottom-loading" class="hidden" style="text-align: center; padding: 40px 0; width: 100%;">
+                <i class="fas fa-spinner fa-spin fa-2x" style="color: var(--accent);"></i>
+            </div>
+            
         </section>
 
         <section id="detail-view" class="hidden">
