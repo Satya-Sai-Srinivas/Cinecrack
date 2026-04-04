@@ -107,14 +107,18 @@ async function discoverMovies() {
         page: String(discoverPage)
     });
 
-    showLoading();
+    if (discoverPage === 1) {
+        grid.innerHTML = buildSkeletonCards(12);
+        emptyMessage.classList.add("hidden");
+    }
     try {
         const response = await fetch(`${DISCOVER_API_BASE_URL}/discover?${params.toString()}`);
         if (!response.ok) throw new Error("Failed to discover movies");
 
         const movies = await response.json();
+        if (discoverPage === 1) grid.innerHTML = "";
+
         if (discoverPage === 1 && !movies.length) {
-            grid.innerHTML = "";
             emptyMessage.classList.remove("hidden");
             sentinel.classList.add("hidden");
             return;
@@ -128,9 +132,10 @@ async function discoverMovies() {
     } catch (error) {
         console.error("Discover error:", error);
         if (discoverPage === 1) {
-            grid.innerHTML = `<p class="discover-empty">Failed to load discover results. Is the backend running?</p>`;
+            grid.innerHTML = `<div class="state-message state-error"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load results</h3><p>Something went wrong. Please check your connection or try again.</p><button onclick="applyDiscoverFilters()">Retry</button></div>`;
         }
         emptyMessage.classList.add("hidden");
+        showToast("Failed to load discover results.", "error");
     } finally {
         isDiscoverLoading = false;
         hideLoading();

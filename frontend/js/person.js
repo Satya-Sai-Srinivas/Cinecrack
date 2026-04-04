@@ -5,7 +5,7 @@ async function loadPersonProfile() {
     const personId = urlParams.get('id');
 
     if (!personId) {
-        alert("No person ID provided.");
+        showToast("No person ID provided.", "error");
         window.location.href = 'index.html';
         return;
     }
@@ -13,12 +13,12 @@ async function loadPersonProfile() {
     try {
         const response = await fetch(`${API_BASE_URL}/${personId}`);
         if (!response.ok) throw new Error("Failed to load profile");
-        
+
         const person = await response.json();
         renderProfile(person);
     } catch (error) {
         console.error(error);
-        alert("Error loading profile data.");
+        showToast("Error loading profile data. Please try again.", "error");
     } finally {
         document.getElementById('loading-overlay').classList.add('hidden');
     }
