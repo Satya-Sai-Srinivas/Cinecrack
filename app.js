@@ -221,10 +221,7 @@ async function loadHistory() {
             }
 
             tagsContainer.innerHTML = uniqueHistory.slice(0, 6).map(h => `
-                <span style="cursor: pointer; transition: background 0.3s; padding: 6px 14px; background: white; border: 1px solid var(--border-color); border-radius: 20px; font-size: 0.9em; color: var(--text-muted); font-weight: 600;" 
-                      onclick="fetchAndShowMovie(${h.movie_id})"
-                      onmouseover="this.style.background='var(--accent)'; this.style.color='white';"
-                      onmouseout="this.style.background='white'; this.style.color='var(--text-muted)';">
+                <span class="history-tag" onclick="fetchAndShowMovie(${h.movie_id})">
                     ${h.movie_title}
                 </span>
             `).join('');
