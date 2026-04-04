@@ -4,18 +4,19 @@ import os
 import urllib.parse
 from fastapi import FastAPI, HTTPException, Depends, Query
 from datetime import date
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, Field
 from datetime import datetime, timedelta
 
 # --- Database Imports ---
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from database import get_db, MovieCache, SearchHistory, engine, Base
+from database import get_db, MovieCache, SearchHistory, init_db
 from contextlib import asynccontextmanager
+from ai_services import generate_embedding, similarity_search_movies, generate_cinematic_reply
 
 # --- Models Imports ---
 from models import MovieDetailResponse, ReleaseInfo, StreamingPlatform, CastMember, Technician, SocialMediaLinks, WorkReference, PersonDetailResponse, MovieCredit
@@ -39,8 +40,7 @@ else:
 # --- 2. App Init & Database Lifespan ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    await init_db()
     yield
 
 app = FastAPI(title="CineCrack API", lifespan=lifespan)
@@ -124,6 +124,67 @@ class MoviePreview(BaseModel):
     title: str
     poster_url: Optional[HttpUrl] = None
     release_date: Optional[date] = None
+
+
+class ConversationTurn(BaseModel):
+    role: str = Field(default="user")
+    content: str
+
+
+class AIChatRequest(BaseModel):
+    query: str
+    conversation_history: Optional[List[ConversationTurn]] = None
+
+
+class AIRecommendedMovie(BaseModel):
+    id: int
+    title: str
+    storyline: str
+    poster_url: Optional[str] = None
+    release_date: Optional[date] = None
+
+
+class AIChatResponse(BaseModel):
+    message: str
+    recommendations: List[AIRecommendedMovie]
+
+
+async def hydrate_ai_movie_cards(
+    movie_records: List[Any],
+) -> List[AIRecommendedMovie]:
+    cards: List[AIRecommendedMovie] = []
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        for movie in movie_records:
+            poster_url = None
+            release_date_value = None
+            try:
+                response = await client.get(
+                    f"{BASE_URL}/movie/{movie.movie_id}",
+                    headers=HEADERS,
+                    params=AUTH_PARAMS,
+                )
+                if response.status_code == 200:
+                    payload = response.json()
+                    poster_path = payload.get("poster_path")
+                    poster_url = (
+                        f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+                    )
+                    release_date_value = safe_parse_date(payload.get("release_date"))
+            except httpx.HTTPError:
+                poster_url = None
+                release_date_value = None
+
+            cards.append(
+                AIRecommendedMovie(
+                    id=movie.movie_id,
+                    title=movie.title,
+                    storyline=movie.storyline,
+                    poster_url=poster_url,
+                    release_date=release_date_value,
+                )
+            )
+
+    return cards
 
 # --- 4. API Endpoints ---
 @app.get("/api/v1/movies/now-playing", response_model=List[MoviePreview])
@@ -237,6 +298,53 @@ async def discover_movies(
                 release_date=safe_parse_date(item.get("release_date"))
             ))
         return movies
+
+
+@app.post("/api/v1/ai/chat", response_model=AIChatResponse)
+async def ai_chat(payload: AIChatRequest, db: AsyncSession = Depends(get_db)):
+    if not payload.query or not payload.query.strip():
+        raise HTTPException(status_code=400, detail="Query must not be empty.")
+
+    if not os.getenv("OPENAI_API_KEY"):
+        raise HTTPException(
+            status_code=500,
+            detail="OPENAI_API_KEY is missing. Add it to your environment before using AI Guru.",
+        )
+
+    try:
+        query_embedding = await generate_embedding(payload.query)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Embedding generation failed: {exc}") from exc
+
+    if not query_embedding:
+        raise HTTPException(status_code=400, detail="Unable to generate embedding from query.")
+
+    retrieved_movies = await similarity_search_movies(db, query_embedding, top_k=5)
+    if not retrieved_movies:
+        return AIChatResponse(
+            message=(
+                "I could not find enough cinematic memory yet. Seed embeddings first, then ask again "
+                "and I will craft a richer recommendation."
+            ),
+            recommendations=[],
+        )
+
+    history_payload: Optional[List[Dict[str, str]]] = None
+    if payload.conversation_history:
+        history_payload = [turn.model_dump() for turn in payload.conversation_history]
+
+    try:
+        ai_message = await generate_cinematic_reply(
+            query=payload.query,
+            conversation_history=history_payload,
+            retrieved_movies=retrieved_movies,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Chat completion failed: {exc}") from exc
+
+    movie_cards = await hydrate_ai_movie_cards(retrieved_movies)
+
+    return AIChatResponse(message=ai_message, recommendations=movie_cards)
 
 # 🌟 MOVED UP: regional-hub must be above {movie_id} to prevent path collision
 @app.get("/api/v1/movies/regional-hub")

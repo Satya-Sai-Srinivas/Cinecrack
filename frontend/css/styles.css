@@ -308,6 +308,149 @@ hr { border: none; height: 1px; background: var(--border-color); margin: 60px 0;
 .movie-row::-webkit-scrollbar { display: none; }
 .movie-row .movie-card { min-width: 160px; max-width: 160px; scroll-snap-align: start; }
 
+/* --- AI GURU PAGE --- */
+.ai-guru-shell {
+    border-radius: 24px;
+    padding: 24px;
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-color) 65%);
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 25px 60px rgba(2, 6, 23, 0.28);
+}
+
+:root[data-theme="light"] .ai-guru-shell {
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 20px 45px rgba(2, 132, 199, 0.12);
+}
+
+.ai-chat-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 66vh;
+    overflow-y: auto;
+    padding-right: 6px;
+    margin-bottom: 20px;
+}
+
+.chat-message {
+    display: flex;
+}
+
+.chat-bubble {
+    max-width: min(82%, 900px);
+    padding: 14px 16px;
+    border-radius: 16px;
+    position: relative;
+    border: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+.chat-bubble p {
+    margin: 0;
+    line-height: 1.7;
+    color: var(--text-main);
+}
+
+.ai-message {
+    justify-content: flex-start;
+}
+
+.ai-message .chat-bubble {
+    border: 1px solid transparent;
+    background:
+        linear-gradient(var(--surface), var(--surface)) padding-box,
+        linear-gradient(125deg, color-mix(in srgb, var(--accent) 85%, #ffffff 15%), transparent 55%, var(--accent)) border-box;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent), 0 0 22px rgba(56, 189, 248, 0.15);
+}
+
+.user-message {
+    justify-content: flex-end;
+}
+
+.user-message .chat-bubble {
+    background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+}
+
+.ai-chat-form {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.ai-query-input {
+    width: 100%;
+    min-height: 52px;
+    max-height: 180px;
+    border-radius: 16px;
+    padding: 14px 16px;
+    resize: none;
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.45;
+}
+
+.cinematic-loader {
+    width: 54px;
+    height: 54px;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+}
+
+.orbital-ring {
+    position: absolute;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: color-mix(in srgb, var(--accent) 80%, #ffffff 20%);
+    border-bottom-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    animation: orbit 1.2s linear infinite;
+}
+
+.orbital-ring.delay {
+    width: 38px;
+    height: 38px;
+    animation-duration: 0.9s;
+    animation-direction: reverse;
+}
+
+.clapper-core {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--surface) 75%, transparent);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.loading-text {
+    color: var(--text-muted) !important;
+    font-size: 14px;
+}
+
+@keyframes orbit {
+    0% { transform: rotate(0deg) scale(1); opacity: 1; }
+    50% { transform: rotate(180deg) scale(1.04); opacity: 0.85; }
+    100% { transform: rotate(360deg) scale(1); opacity: 1; }
+}
+
+.ai-reco-row {
+    margin-top: 14px;
+    padding-bottom: 4px;
+}
+
+.ai-reco-row .movie-card {
+    min-width: 145px;
+    max-width: 145px;
+}
+
 /* --- LOADING SPINNER --- */
 #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--overlay-bg); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; color: var(--text-main); backdrop-filter: blur(5px); }
 .spinner { width: 50px; height: 50px; border: 4px solid var(--border-color); border-top: 4px solid var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }

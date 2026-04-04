@@ -19,25 +19,20 @@
             }
         })();
     </script>
-    <title>Cinema Hub - CineCrack</title>
+    <title>AI Guru - CineCrack</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/styles.css?v=20260308b">
+    <link rel="stylesheet" href="css/styles.css?v=20260314a">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <div id="loading-overlay">
-        <div class="spinner"></div>
-        <p style="font-weight: 600;">Loading the Hub...</p>
-    </div>
-
     <div class="layout">
         <aside class="sidebar">
             <div class="logo" onclick="window.location.href='index.html'">🎬 CineCrack</div>
             <nav>
                 <a href="index.html" class="nav-link"><i class="fas fa-home"></i> Home</a>
-                <a href="regional.html" class="nav-link active"><i class="fas fa-globe-americas"></i> Cinema Hub</a>
+                <a href="regional.html" class="nav-link"><i class="fas fa-globe-americas"></i> Cinema Hub</a>
                 <a href="discover.html" class="nav-link"><i class="fas fa-compass"></i> Discover</a>
-                <a href="ai-guru.html" class="nav-link"><i class="fas fa-magic"></i> AI Guru</a>
+                <a href="ai-guru.html" class="nav-link active"><i class="fas fa-magic"></i> AI Guru</a>
             </nav>
             <div class="sidebar-bottom">
                 <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode"></button>
@@ -45,36 +40,35 @@
         </aside>
 
         <main class="main-content">
-            <h1 style="font-size: 42px; margin-bottom: 40px; color: var(--text-main);">🌍 The Cinema Hub</h1>
+            <h1 style="font-size: 42px; margin-bottom: 10px; color: var(--text-main);">AI Cinema Guru</h1>
+            <p style="margin-top: 0; color: var(--text-muted); margin-bottom: 22px;">
+                Ask for precise, mood-driven, story-specific movie recommendations.
+            </p>
 
-            <div class="movie-row-container">
-                <h2>Trending in Tollywood</h2>
-                <div class="movie-row" id="row-tollywood"></div>
-            </div>
+            <section class="ai-guru-shell">
+                <div id="ai-chat-thread" class="ai-chat-thread">
+                    <article class="chat-message ai-message">
+                        <div class="chat-bubble">
+                            <p>Welcome. Describe a vibe, character arc, ending tone, or visual atmosphere, and I will curate cinematic matches.</p>
+                        </div>
+                    </article>
+                </div>
 
-            <div class="movie-row-container">
-                <h2>Bollywood Blockbusters</h2>
-                <div class="movie-row" id="row-bollywood"></div>
-            </div>
-
-            <div class="movie-row-container">
-                <h2>Kollywood Hits</h2>
-                <div class="movie-row" id="row-kollywood"></div>
-            </div>
-
-            <div class="movie-row-container">
-                <h2>Mollywood Hits</h2>
-                <div class="movie-row" id="row-mollywood"></div>
-            </div>
-
-            <div class="movie-row-container">
-                <h2>Top Rated International (KR, JP, FR, ES)</h2>
-                <div class="movie-row" id="row-international"></div>
-            </div>
+                <form id="ai-chat-form" class="ai-chat-form">
+                    <textarea
+                        id="ai-query-input"
+                        class="ai-query-input"
+                        rows="2"
+                        placeholder="Try: Dark sci-fi with morally conflicted AI and a hopeful ending..."
+                        required
+                    ></textarea>
+                    <button id="ai-send-btn" type="submit"><i class="fas fa-paper-plane"></i> Summon</button>
+                </form>
+            </section>
         </main>
     </div>
 
     <script src="js/theme.js?v=20260308b"></script>
-    <script src="js/regional.js"></script>
+    <script src="js/ai-guru.js"></script>
 </body>
 </html>

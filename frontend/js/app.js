@@ -428,6 +428,8 @@ window.onload = async () => {
             setNavContext({ source: 'regional', returnUrl: 'regional.html' });
         } else if (refFromUrl === 'discover') {
             setNavContext({ source: 'discover', returnUrl: 'discover.html' });
+        } else if (refFromUrl === 'ai-guru') {
+            setNavContext({ source: 'ai-guru', returnUrl: 'ai-guru.html' });
         } else if (refFromUrl === 'person') {
             setNavContext({
                 source: 'person',
