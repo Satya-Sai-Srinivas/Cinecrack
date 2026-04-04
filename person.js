@@ -1,7 +1,6 @@
 const API_BASE_URL = "http://127.0.0.1:8000/api/v1/person";
 
 async function loadPersonProfile() {
-    // Extract ID from URL (e.g., person.html?id=123)
     const urlParams = new URLSearchParams(window.location.search);
     const personId = urlParams.get('id');
 
@@ -47,7 +46,6 @@ function renderProfile(person) {
 
     document.getElementById('person-bio').textContent = person.biography;
 
-    // Render Socials
     const socialsDiv = document.getElementById('person-socials');
     let socialsHtml = '';
     const s = person.social_handles;
@@ -60,18 +58,17 @@ function renderProfile(person) {
     
     socialsDiv.innerHTML = socialsHtml;
 
-    // Render Filmography Grid
     const grid = document.getElementById('filmography-grid');
     if (person.credits.length === 0) {
-        grid.innerHTML = '<p style="color: #9ca3af;">No filmography data available.</p>';
+        grid.innerHTML = '<p style="color: var(--text-muted);">No filmography data available.</p>';
     } else {
         grid.innerHTML = person.credits.map(movie => `
             <div class="movie-card" onclick="window.location.href='index.html?movie_id=${movie.id}'">
                 <img src="${movie.poster_url || 'https://via.placeholder.com/500x750?text=No+Poster'}" alt="${movie.title}">
                 <div class="movie-card-info" style="padding: 10px 0;">
-                    <h3 style="margin:0; font-size:15px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">${movie.title}</h3>
+                    <h3 style="margin:0; font-size:15px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; color: var(--text-main);">${movie.title}</h3>
                     <p style="margin: 3px 0 0 0; color: var(--accent); font-size: 13px; font-weight:600;">${movie.role}</p>
-                    <p style="margin: 0; color: #6b7280; font-size: 12px;">${movie.release_date ? movie.release_date.substring(0,4) : 'Upcoming'}</p>
+                    <p style="margin: 0; color: var(--text-muted); font-size: 12px;">${movie.release_date ? movie.release_date.substring(0,4) : 'Upcoming'}</p>
                 </div>
             </div>
         `).join('');

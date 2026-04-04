@@ -55,11 +55,9 @@ app.add_middleware(
 
 # --- 3. Helper Functions ---
 def build_social_links(external_ids: dict, person_name: str = "") -> SocialMediaLinks:
-    # Safely handle TMDB returning null for external_ids
     if not external_ids:
         external_ids = {}
         
-    # Safely URL-encode the name so Pydantic doesn't throw a validation error
     wiki_url = None
     if person_name:
         safe_name = urllib.parse.quote(person_name.replace(' ', '_'))
@@ -93,7 +91,6 @@ async def fetch_person_data(client: httpx.AsyncClient, person: dict, is_cast: bo
         
     socials = build_social_links(data.get("external_ids") or {}, person_name)
     
-    # Safe extraction for movie credits
     credits_data = data.get("movie_credits") or {}
     credits_key = "cast" if is_cast else "crew"
     past_works_data = credits_data.get(credits_key, [])
@@ -194,6 +191,59 @@ async def search_movies(query: str, page: int = 1):
             ))
         return movies
 
+# 🌟 MOVED UP: regional-hub must be above {movie_id} to prevent path collision
+@app.get("/api/v1/movies/regional-hub")
+async def get_regional_hub():
+    """Fetches multiple regional and international categories concurrently."""
+    
+    async def fetch_category(lang: str, extra_params: dict = None):
+        url = f"{BASE_URL}/discover/movie"
+        today = datetime.utcnow()
+        past_six_months = today - timedelta(days=180)
+        
+        params = {
+            "with_original_language": lang,
+            "sort_by": "popularity.desc",
+            "release_date.gte": past_six_months.strftime("%Y-%m-%d"),
+            "release_date.lte": today.strftime("%Y-%m-%d"),
+            "page": 1,
+            **AUTH_PARAMS
+        }
+        if extra_params:
+            params.update(extra_params)
+            
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=HEADERS, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                movies = []
+                for item in data.get("results", [])[:15]:
+                    poster = f"https://image.tmdb.org/t/p/w500{item['poster_path']}" if item.get('poster_path') else None
+                    movies.append(MoviePreview(
+                        id=item["id"], 
+                        title=item["title"], 
+                        poster_url=poster, 
+                        release_date=safe_parse_date(item.get("release_date"))
+                    ))
+                return [m.model_dump(mode='json') for m in movies]
+            return []
+
+    t_task = fetch_category("te") 
+    b_task = fetch_category("hi") 
+    k_task = fetch_category("ta") 
+    m_task = fetch_category("ml") 
+    i_task = fetch_category("ko|ja|fr|es") 
+
+    t, b, k, m, i = await asyncio.gather(t_task, b_task, k_task, m_task, i_task)
+
+    return {
+        "tollywood": t,
+        "bollywood": b,
+        "kollywood": k,
+        "mollywood": m,
+        "international": i
+    }
+
 
 @app.get("/api/v1/movies/{movie_id}", response_model=MovieDetailResponse)
 async def get_movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
@@ -222,7 +272,6 @@ async def get_movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
             poster_url = f"https://image.tmdb.org/t/p/w500{movie_data['poster_path']}" if movie_data.get('poster_path') else None
             genres = [g["name"] for g in movie_data.get("genres") or []]
             
-            # SAFE NESTED EXTRACTION: Fallback to {} if a key returns null
             providers_data = movie_data.get("watch/providers") or {}
             results_data = providers_data.get("results") or {}
             us_providers = results_data.get("US") or {}
@@ -295,7 +344,6 @@ async def get_person_details(person_id: int):
         socials = build_social_links(data.get("external_ids") or {}, person_name)
         profile_url = f"https://image.tmdb.org/t/p/w500{data['profile_path']}" if data.get('profile_path') else None
         
-        # Safe extraction for credits
         credits_data = data.get("combined_credits") or {}
         is_actor = data.get("known_for_department") == "Acting"
         raw_credits = credits_data.get("cast" if is_actor else "crew", [])
@@ -330,63 +378,6 @@ async def get_person_details(person_id: int):
             social_handles=socials,
             credits=credits_list
         )
-
-
-@app.get("/api/v1/movies/regional-hub")
-async def get_regional_hub():
-    """Fetches multiple regional and international categories concurrently."""
-    
-    async def fetch_category(lang: str, extra_params: dict = None):
-        url = f"{BASE_URL}/discover/movie"
-        # We look for relatively recent popular movies
-        today = datetime.utcnow()
-        past_six_months = today - timedelta(days=180)
-        
-        params = {
-            "with_original_language": lang,
-            "sort_by": "popularity.desc",
-            "release_date.gte": past_six_months.strftime("%Y-%m-%d"),
-            "release_date.lte": today.strftime("%Y-%m-%d"),
-            "page": 1,
-            **AUTH_PARAMS
-        }
-        if extra_params:
-            params.update(extra_params)
-            
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=HEADERS, params=params)
-            if response.status_code == 200:
-                data = response.json()
-                movies = []
-                # Grab the top 15 for each horizontal scrolling row
-                for item in data.get("results", [])[:15]:
-                    poster = f"https://image.tmdb.org/t/p/w500{item['poster_path']}" if item.get('poster_path') else None
-                    movies.append(MoviePreview(
-                        id=item["id"], 
-                        title=item["title"], 
-                        poster_url=poster, 
-                        release_date=safe_parse_date(item.get("release_date"))
-                    ))
-                return [m.model_dump(mode='json') for m in movies]
-            return []
-
-    # Fetch all 5 categories at the exact same time
-    t_task = fetch_category("te") # Telugu
-    b_task = fetch_category("hi") # Hindi
-    k_task = fetch_category("ta") # Tamil
-    m_task = fetch_category("ml") # Malayalam
-    i_task = fetch_category("ko|ja|fr|es") # International (Korean, Japanese, French, Spanish)
-
-    t, b, k, m, i = await asyncio.gather(t_task, b_task, k_task, m_task, i_task)
-
-    return {
-        "tollywood": t,
-        "bollywood": b,
-        "kollywood": k,
-        "mollywood": m,
-        "international": i
-    }
-
 
 @app.get("/api/v1/history")
 async def get_search_history(db: AsyncSession = Depends(get_db)):
