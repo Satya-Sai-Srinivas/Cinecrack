@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, HttpUrl
+from datetime import datetime, timedelta
 
 # --- Database Imports ---
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -127,9 +128,29 @@ class MoviePreview(BaseModel):
 
 # --- 4. API Endpoints ---
 @app.get("/api/v1/movies/now-playing", response_model=List[MoviePreview])
-async def get_now_playing(region: str = "US"):
-    url = f"{BASE_URL}/movie/now_playing"
-    params = {"region": region, "page": 1, **AUTH_PARAMS}
+async def get_now_playing(region: str = "US", lang: str = "all"):
+    """Fetches movies, with advanced filtering for specific regional industries."""
+    
+    if lang != "all":
+        # ⚡ ADVANCED: Use Discover API to force specific regional languages
+        url = f"{BASE_URL}/discover/movie"
+        today = datetime.utcnow()
+        past_month = today - timedelta(days=45) # Look at releases from the last 45 days
+        
+        params = {
+            "region": region,
+            "with_release_type": "2|3", # 2 = Limited Theatrical, 3 = Theatrical
+            "release_date.gte": past_month.strftime("%Y-%m-%d"),
+            "release_date.lte": today.strftime("%Y-%m-%d"),
+            "with_original_language": lang,
+            "sort_by": "popularity.desc",
+            "page": 1,
+            **AUTH_PARAMS
+        }
+    else:
+        # 🐢 BASIC: Default Now Playing API
+        url = f"{BASE_URL}/movie/now_playing"
+        params = {"region": region, "page": 1, **AUTH_PARAMS}
     
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=HEADERS, params=params)
@@ -140,7 +161,9 @@ async def get_now_playing(region: str = "US"):
             
         data = response.json()
         movies = []
-        for item in data.get("results", [])[:12]:
+        
+        # INCREASED from 12 to 20 to show more movies!
+        for item in data.get("results", [])[:20]:
             poster = f"https://image.tmdb.org/t/p/w500{item['poster_path']}" if item.get('poster_path') else None
             movies.append(MoviePreview(
                 id=item["id"], 

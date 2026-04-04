@@ -1,6 +1,34 @@
 // Ensure this matches your FastAPI server port
 const API_BASE_URL = "http://127.0.0.1:8000/api/v1/movies";
 
+// Global State
+let currentRegion = 'US';
+let currentLang = 'all';
+
+// --- Switch Market Logic ---
+function switchMarket(region) {
+    if (currentRegion === region) return;
+    currentRegion = region;
+    
+    // Toggle main buttons
+    document.getElementById('btn-US').classList.toggle('active', region === 'US');
+    document.getElementById('btn-IN').classList.toggle('active', region === 'IN');
+    
+    // Show/Hide Indian Language Filters
+    const langFilters = document.getElementById('regional-filters');
+    if (region === 'IN') {
+        langFilters.style.display = 'flex';
+    } else {
+        langFilters.style.display = 'none';
+        currentLang = 'all'; // Always reset language when switching away from India
+        updateLangButtons();
+    }
+    
+    updateSectionTitle();
+    loadNowPlaying();
+}
+
+
 // --- View Toggling & Scroll Fix ---
 function showHomeView() {
     document.getElementById('home-view').classList.remove('hidden');
@@ -27,11 +55,42 @@ function hideLoading() {
     if (overlay) overlay.classList.add('hidden');
 }
 
+function filterLanguage(lang) {
+    if (currentLang === lang) return;
+    currentLang = lang;
+    updateLangButtons();
+    updateSectionTitle();
+    loadNowPlaying();
+}
+
+function updateLangButtons() {
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('onclick').includes(`'${currentLang}'`)) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+function updateSectionTitle() {
+    const sectionTitle = document.querySelector('.section-title');
+    if (!sectionTitle) return;
+    
+    if (currentRegion === 'US') {
+        sectionTitle.textContent = 'Now Playing in US Theaters';
+    } else {
+        const langNames = { 'all': 'Indian', 'te': 'Telugu', 'hi': 'Hindi', 'ta': 'Tamil', 'ml': 'Malayalam' };
+        sectionTitle.textContent = `Now Playing in Theaters (${langNames[currentLang]})`;
+    }
+}
+
+
 // --- Fetch & Render Now Playing (Default Homepage) ---
 async function loadNowPlaying() {
     showLoading(); 
     try {
-        const response = await fetch(`${API_BASE_URL}/now-playing`);
+        // FIXED: Passes both region and language to the backend
+        const response = await fetch(`${API_BASE_URL}/now-playing?region=${currentRegion}&lang=${currentLang}`);
         if (!response.ok) throw new Error("Failed to load now playing");
         
         const movies = await response.json();
@@ -56,9 +115,7 @@ function resetToHome() {
     const searchInput = document.getElementById('movie-search-input');
     if (searchInput) searchInput.value = '';
 
-    const sectionTitle = document.querySelector('.section-title');
-    if (sectionTitle) sectionTitle.textContent = 'Now Playing in Theaters';
-
+    updateSectionTitle();
     loadNowPlaying();
     showHomeView();
 }

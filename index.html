@@ -15,8 +15,22 @@
     </div>
     <header>
         <div class="logo" onclick="resetToHome()" style="cursor: pointer;">🎬 CineCrack</div>
+        
+        <div class="market-toggle">
+            <button id="btn-US" class="market-btn active" onclick="switchMarket('US')">🇺🇸 US</button>
+            <button id="btn-IN" class="market-btn" onclick="switchMarket('IN')">🇮🇳 India</button>
+        </div>
+
+        <div id="regional-filters" style="display: none; gap: 10px; margin-top: 15px; justify-content: center;">
+            <button class="lang-btn active" onclick="filterLanguage('all')">All</button>
+            <button class="lang-btn" onclick="filterLanguage('te')">Telugu</button>
+            <button class="lang-btn" onclick="filterLanguage('hi')">Hindi</button>
+            <button class="lang-btn" onclick="filterLanguage('ta')">Tamil</button>
+            <button class="lang-btn" onclick="filterLanguage('ml')">Malayalam</button>
+        </div>
+
         <div class="search-bar">
-            <input type="text" id="movie-search-input" placeholder="Search for a movie (e.g., Inception)">
+            <input type="text" id="movie-search-input" placeholder="Search for a movie...">
             <button onclick="executeSearch()">Search</button>
         </div>
     </header>
