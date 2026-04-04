@@ -245,21 +245,21 @@ async function loadNowPlaying() {
     currentPage = 1;
     hasMoreData = true;
 
-    showLoading(); 
+    const grid = document.getElementById('now-playing-grid');
+    grid.innerHTML = buildSkeletonCards(12);
     try {
         const response = await fetch(`${API_BASE_URL}/now-playing?region=${currentRegion}&lang=${currentLang}&page=${currentPage}`);
         if (!response.ok) throw new Error("Failed to load now playing");
-        
+
         const movies = await response.json();
-        const grid = document.getElementById('now-playing-grid');
-        
+
         if (movies.length < 20) hasMoreData = false;
         grid.innerHTML = movies.map(buildMovieCardHTML).join('');
     } catch (error) {
         console.error("Error loading now playing:", error);
-        document.getElementById('now-playing-grid').innerHTML = '<p style="color: var(--text-muted); padding: 20px;">Failed to load movies. Is the backend running?</p>';
+        grid.innerHTML = `<div class="state-message state-error"><i class="fas fa-exclamation-triangle"></i><h3>Something went wrong</h3><p>Could not load movies. Please check your connection or try again.</p><button onclick="loadNowPlaying()">Retry</button></div>`;
     } finally {
-        hideLoading(); 
+        hideLoading();
     }
 }
 
@@ -312,29 +312,32 @@ async function executeSearch() {
     currentPage = 1;
     hasMoreData = true;
 
-    showLoading();
+    const grid = document.getElementById('now-playing-grid');
+    grid.innerHTML = buildSkeletonCards(12);
+    showHomeView();
     try {
         const response = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}&page=${currentPage}`);
         if (!response.ok) throw new Error("Search failed");
-        
+
         const movies = await response.json();
-        const grid = document.getElementById('now-playing-grid');
-        
-        document.querySelector('.section-title').textContent = `Search Results for "${query}"`;
-        
+
         if (movies.length < 20) hasMoreData = false;
 
+        document.querySelector('.section-title').textContent = movies.length > 0
+            ? `Search Results for "${query}" (${movies.length} movie${movies.length !== 1 ? 's' : ''})`
+            : `Search Results for "${query}"`;
+
         if (movies.length === 0) {
-            grid.innerHTML = `<p style="color: var(--text-muted); padding: 20px;">No movies found for "${query}".</p>`;
+            grid.innerHTML = `<div class="state-message state-empty"><i class="fas fa-search"></i><h3>No movies found</h3><p>Nothing matched "${query}". Try different keywords or check the spelling.</p></div>`;
         } else {
             grid.innerHTML = movies.map(buildMovieCardHTML).join('');
         }
-        showHomeView();
     } catch (error) {
         console.error("Error searching movies:", error);
-        alert("Failed to search for movies. Please try again.");
+        grid.innerHTML = `<div class="state-message state-error"><i class="fas fa-exclamation-triangle"></i><h3>Search failed</h3><p>Something went wrong. Please try again.</p><button onclick="executeSearch()">Retry</button></div>`;
+        showToast("Failed to search for movies. Please try again.", "error");
     } finally {
-        hideLoading(); 
+        hideLoading();
     }
 }
 
@@ -363,7 +366,7 @@ async function fetchAndShowMovie(movieId = null, options = {}) {
         loadHistory(); 
     } catch (error) {
         console.error("Error:", error);
-        alert("Failed to fetch movie details.");
+        showToast("Failed to fetch movie details.", "error");
     } finally {
         hideLoading(); 
     }

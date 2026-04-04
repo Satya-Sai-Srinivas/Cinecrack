@@ -374,6 +374,7 @@ function bindChatbotEvents() {
         conversationHistory = [];
         persistHistory();
         renderConversationFromHistory();
+        showToast("Chat history cleared.", "success");
     });
     form.addEventListener("submit", onSubmitChat);
     input.addEventListener("input", autoResizeTextarea);

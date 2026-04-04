@@ -90,6 +90,34 @@ function initTheme() {
     initSidebarToggle();
 }
 
+/* --- Toast Notification Utility --- */
+function showToast(message, type = "error") {
+    let container = document.getElementById("toast-container");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "toast-container";
+        container.className = "toast-container";
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add("toast-out");
+        toast.addEventListener("animationend", () => toast.remove());
+    }, 3000);
+}
+
+/* --- Skeleton Card Generator --- */
+function buildSkeletonCards(count = 12) {
+    return Array.from({ length: count }, () =>
+        `<div class="skeleton-card"><div class="skeleton-poster"></div><div class="skeleton-title"></div><div class="skeleton-subtitle"></div></div>`
+    ).join("");
+}
+
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initTheme);
 } else {

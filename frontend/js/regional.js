@@ -15,7 +15,7 @@ async function loadHubData() {
 
     } catch (error) {
         console.error(error);
-        alert("Error loading the Cinema Hub.");
+        showToast("Error loading the Cinema Hub. Please try again.", "error");
     } finally {
         document.getElementById('loading-overlay').classList.add('hidden');
     }
