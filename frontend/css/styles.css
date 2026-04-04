@@ -174,6 +174,59 @@ button:hover { background-color: var(--accent-hover); transform: scale(1.05); }
 .lang-btn:hover { background: var(--bg-color); color: var(--text-main); transform: none; }
 .lang-btn.active { background: var(--accent); color: var(--text-inverse); border-color: var(--accent); }
 
+/* --- DISCOVER FILTERS --- */
+.discover-toolbar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-bottom: 28px;
+    padding: 18px;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    background: var(--surface);
+}
+
+.discover-control {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.discover-control label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.discover-control select,
+.discover-control input[type="range"] {
+    width: 100%;
+}
+
+.discover-control select {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--surface);
+    color: var(--text-main);
+}
+
+.slider-value {
+    font-size: 13px;
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+.discover-actions {
+    display: flex;
+    align-items: flex-end;
+}
+
+.discover-empty {
+    color: var(--text-muted);
+    padding: 20px 0;
+}
+
 /* --- TYPOGRAPHY & UTILS --- */
 .hidden { display: none !important; }
 .section-title { font-size: 32px; font-weight: 700; margin-bottom: 30px; color: var(--text-main); }
@@ -217,9 +270,6 @@ hr { border: none; height: 1px; background: var(--border-color); margin: 60px 0;
 .movie-card-info p { margin: 0; color: var(--text-muted); font-size: 13px; }
 
 /* --- DETAIL VIEW HERO --- */
-.back-btn { background: var(--surface); border: 1px solid var(--border-color); color: var(--text-main); margin-bottom: 30px; display: inline-flex; align-items: center; gap: 8px; }
-.back-btn:hover { background: var(--bg-color); color: var(--accent); }
-
 .hero-section { display: flex; gap: 50px; margin-bottom: 40px; align-items: flex-start; }
 #movie-poster { width: 320px; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.15); }
 .movie-info h1 { font-size: 48px; margin: 0 0 15px 0; font-weight: 800; line-height: 1.1; letter-spacing: -1px; }

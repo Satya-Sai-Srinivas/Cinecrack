@@ -2,7 +2,7 @@ import asyncio
 import httpx
 import os
 import urllib.parse
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Query
 from datetime import date
 from typing import List, Optional, Any
 from fastapi.middleware.cors import CORSMiddleware
@@ -187,6 +187,53 @@ async def search_movies(query: str, page: int = 1):
                 id=item["id"], 
                 title=item["title"], 
                 poster_url=poster, 
+                release_date=safe_parse_date(item.get("release_date"))
+            ))
+        return movies
+
+
+@app.get("/api/v1/movies/discover", response_model=List[MoviePreview])
+async def discover_movies(
+    genre: Optional[int] = Query(default=None, description="TMDB genre ID"),
+    release_year_gte: Optional[int] = Query(default=None, ge=1900, le=2100),
+    release_year_lte: Optional[int] = Query(default=None, ge=1900, le=2100),
+    min_rating: Optional[float] = Query(default=None, ge=0, le=10),
+    page: int = Query(default=1, ge=1, le=500)
+):
+    if release_year_gte and release_year_lte and release_year_gte > release_year_lte:
+        raise HTTPException(status_code=400, detail="release_year_gte cannot be greater than release_year_lte")
+
+    url = f"{BASE_URL}/discover/movie"
+    params = {
+        "include_adult": "false",
+        "sort_by": "popularity.desc",
+        "vote_count.gte": 50,
+        "page": page,
+        **AUTH_PARAMS
+    }
+
+    if genre:
+        params["with_genres"] = genre
+    if release_year_gte:
+        params["primary_release_date.gte"] = f"{release_year_gte}-01-01"
+    if release_year_lte:
+        params["primary_release_date.lte"] = f"{release_year_lte}-12-31"
+    if min_rating is not None:
+        params["vote_average.gte"] = min_rating
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=HEADERS, params=params)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="Failed to discover movies")
+
+        data = response.json()
+        movies = []
+        for item in data.get("results", []):
+            poster = f"https://image.tmdb.org/t/p/w500{item['poster_path']}" if item.get("poster_path") else None
+            movies.append(MoviePreview(
+                id=item["id"],
+                title=item.get("title", "Unknown"),
+                poster_url=poster,
                 release_date=safe_parse_date(item.get("release_date"))
             ))
         return movies
@@ -386,4 +433,4 @@ async def get_search_history(db: AsyncSession = Depends(get_db)):
     return history
 
 # --- 5. Mount Frontend ---
-app.mount("/", StaticFiles(directory=".", html=True), name="static")
+app.mount("/", StaticFiles(directory="frontend", html=True), name="static")

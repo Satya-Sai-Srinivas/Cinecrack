@@ -11,6 +11,75 @@ let isLoadingMore = false;
 let hasMoreData = true;
 let currentMode = 'now-playing';
 let currentSearchQuery = '';
+const NAV_CONTEXT_KEY = 'cinecrack-nav-context';
+
+function setNavContext(context) {
+    sessionStorage.setItem(NAV_CONTEXT_KEY, JSON.stringify(context));
+}
+
+function getNavContext() {
+    try {
+        const raw = sessionStorage.getItem(NAV_CONTEXT_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function openMovieFromIndex(movieId) {
+    const searchInput = document.getElementById('movie-search-input');
+    const sectionTitle = document.querySelector('.section-title');
+
+    setNavContext({
+        source: currentMode === 'search' ? 'index-search' : 'index-home',
+        searchQuery: currentSearchQuery,
+        searchInputValue: searchInput ? searchInput.value : '',
+        sectionTitle: sectionTitle ? sectionTitle.textContent : '',
+        scrollY: window.scrollY
+    });
+
+    fetchAndShowMovie(movieId, { pushHistory: true });
+}
+
+function restoreIndexContext(context) {
+    if (!context) return;
+
+    if (context.source === 'index-search') {
+        const searchInput = document.getElementById('movie-search-input');
+        if (searchInput && typeof context.searchInputValue === 'string') {
+            searchInput.value = context.searchInputValue;
+        }
+        if (typeof context.searchQuery === 'string') {
+            currentSearchQuery = context.searchQuery;
+        }
+        if (context.sectionTitle) {
+            const sectionTitle = document.querySelector('.section-title');
+            if (sectionTitle) sectionTitle.textContent = context.sectionTitle;
+        }
+    }
+
+    if (typeof context.scrollY === 'number') {
+        setTimeout(() => window.scrollTo({ top: context.scrollY, behavior: 'instant' }), 10);
+    }
+}
+
+async function handlePopState() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const movieIdFromUrl = urlParams.get('movie_id');
+    const historyState = window.history.state || {};
+    const context = historyState.context || getNavContext();
+
+    if (movieIdFromUrl) {
+        if (historyState.context) {
+            setNavContext(historyState.context);
+        }
+        await fetchAndShowMovie(movieIdFromUrl, { pushHistory: false });
+        return;
+    }
+
+    showHomeView(false);
+    restoreIndexContext(context);
+}
 
 async function initLocation() {
     try {
@@ -66,10 +135,12 @@ function switchMarket(target) {
     loadNowPlaying();
 }
 
-function showHomeView() {
+function showHomeView(resetScroll = true) {
     document.getElementById('home-view').classList.remove('hidden');
     document.getElementById('detail-view').classList.add('hidden');
-    setTimeout(() => window.scrollTo({ top: 0, behavior: 'instant' }), 10);
+    if (resetScroll) {
+        setTimeout(() => window.scrollTo({ top: 0, behavior: 'instant' }), 10);
+    }
 }
 
 function showDetailView() {
@@ -159,7 +230,7 @@ async function fetchNextBatch() {
 
 function buildMovieCardHTML(movie) {
     return `
-        <div class="movie-card" onclick="fetchAndShowMovie(${movie.id})">
+        <div class="movie-card" onclick="openMovieFromIndex(${movie.id})">
             <img src="${movie.poster_url || 'https://via.placeholder.com/500x750?text=No+Poster'}" alt="${movie.title}">
             <div class="movie-card-info">
                 <h3>${movie.title}</h3>
@@ -221,7 +292,7 @@ async function loadHistory() {
             }
 
             tagsContainer.innerHTML = uniqueHistory.slice(0, 6).map(h => `
-                <span class="history-tag" onclick="fetchAndShowMovie(${h.movie_id})">
+                <span class="history-tag" onclick="openMovieFromIndex(${h.movie_id})">
                     ${h.movie_title}
                 </span>
             `).join('');
@@ -271,8 +342,16 @@ document.getElementById('movie-search-input')?.addEventListener('keypress', func
     if (e.key === 'Enter') executeSearch();
 });
 
-async function fetchAndShowMovie(movieId = null) {
+async function fetchAndShowMovie(movieId = null, options = {}) {
     if (!movieId) return;
+    const { pushHistory = false } = options;
+
+    if (pushHistory) {
+        const context = getNavContext();
+        const nextUrl = `${window.location.pathname}?movie_id=${movieId}`;
+        window.history.pushState({ view: 'detail', movieId, context }, '', nextUrl);
+    }
+
     showLoading(); 
     try {
         const response = await fetch(`${API_BASE_URL}/${movieId}`);
@@ -341,10 +420,32 @@ window.onload = async () => {
 
     const urlParams = new URLSearchParams(window.location.search);
     const movieIdFromUrl = urlParams.get('movie_id');
+    const refFromUrl = urlParams.get('ref');
+    const returnTo = urlParams.get('return_to');
 
     if (movieIdFromUrl) {
+        if (refFromUrl === 'regional') {
+            setNavContext({ source: 'regional', returnUrl: 'regional.html' });
+        } else if (refFromUrl === 'discover') {
+            setNavContext({ source: 'discover', returnUrl: 'discover.html' });
+        } else if (refFromUrl === 'person') {
+            setNavContext({
+                source: 'person',
+                returnUrl: returnTo ? decodeURIComponent(returnTo) : 'person.html'
+            });
+        }
+
         await fetchAndShowMovie(movieIdFromUrl);
         window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+        const baseState = window.history.state || {};
+        window.history.replaceState(
+            { ...baseState, view: 'home', context: getNavContext() },
+            document.title,
+            window.location.pathname
+        );
     }
+
+    window.addEventListener('popstate', handlePopState);
     hideLoading();
 };

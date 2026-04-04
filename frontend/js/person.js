@@ -59,11 +59,12 @@ function renderProfile(person) {
     socialsDiv.innerHTML = socialsHtml;
 
     const grid = document.getElementById('filmography-grid');
+    const returnTo = encodeURIComponent(`person.html?id=${person.id}`);
     if (person.credits.length === 0) {
         grid.innerHTML = '<p style="color: var(--text-muted);">No filmography data available.</p>';
     } else {
         grid.innerHTML = person.credits.map(movie => `
-            <div class="movie-card" onclick="window.location.href='index.html?movie_id=${movie.id}'">
+            <div class="movie-card" onclick="window.location.href='index.html?movie_id=${movie.id}&ref=person&return_to=${returnTo}'">
                 <img src="${movie.poster_url || 'https://via.placeholder.com/500x750?text=No+Poster'}" alt="${movie.title}">
                 <div class="movie-card-info" style="padding: 10px 0;">
                     <h3 style="margin:0; font-size:15px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; color: var(--text-main);">${movie.title}</h3>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (() => {
+            try {
+                const key = "cinecrack-theme";
+                const savedTheme = localStorage.getItem(key);
+                const preferredDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+                const initialTheme = savedTheme === "dark" || savedTheme === "light"
+                    ? savedTheme
+                    : (preferredDark ? "dark" : "light");
+                document.documentElement.setAttribute("data-theme", initialTheme);
+                document.documentElement.classList.toggle("dark-theme", initialTheme === "dark");
+            } catch (error) {
+                document.documentElement.setAttribute("data-theme", "light");
+            }
+        })();
+    </script>
+    <title>Discover - CineCrack</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css?v=20260308b">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div id="loading-overlay" class="hidden">
+        <div class="spinner"></div>
+        <p style="font-weight: 600;">Discovering movies...</p>
+    </div>
+
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="logo" onclick="window.location.href='index.html'">🎬 CineCrack</div>
+            <nav>
+                <a href="index.html" class="nav-link"><i class="fas fa-home"></i> Home</a>
+                <a href="regional.html" class="nav-link"><i class="fas fa-globe-americas"></i> Cinema Hub</a>
+                <a href="discover.html" class="nav-link active"><i class="fas fa-compass"></i> Discover</a>
+            </nav>
+            <div class="sidebar-bottom">
+                <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode"></button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <h1 style="font-size: 42px; margin-bottom: 10px; color: var(--text-main);">Discover Movies</h1>
+            <p style="margin-top: 0; color: var(--text-muted); margin-bottom: 25px;">
+                Filter by genre, release year range, and minimum user rating.
+            </p>
+
+            <form id="discover-form" class="discover-toolbar">
+                <div class="discover-control">
+                    <label for="genre-select">Genre</label>
+                    <select id="genre-select">
+                        <option value="">All Genres</option>
+                    </select>
+                </div>
+
+                <div class="discover-control">
+                    <label for="year-min">Release Year (From)</label>
+                    <input id="year-min" type="range" min="1980" max="2030" step="1" value="2000">
+                    <span id="year-min-value" class="slider-value">2000</span>
+                </div>
+
+                <div class="discover-control">
+                    <label for="year-max">Release Year (To)</label>
+                    <input id="year-max" type="range" min="1980" max="2030" step="1" value="2026">
+                    <span id="year-max-value" class="slider-value">2026</span>
+                </div>
+
+                <div class="discover-control">
+                    <label for="rating-min">Minimum User Rating</label>
+                    <input id="rating-min" type="range" min="0" max="10" step="0.5" value="6.5">
+                    <span id="rating-min-value" class="slider-value">6.5</span>
+                </div>
+
+                <div class="discover-actions">
+                    <button type="submit"><i class="fas fa-sliders-h"></i> Apply Filters</button>
+                </div>
+            </form>
+
+            <h2 class="section-title" style="margin-bottom: 18px;">Discover Results</h2>
+            <div class="grid-container" id="discover-grid"></div>
+            <p id="discover-empty" class="discover-empty hidden">No movies matched your filters. Try widening the range.</p>
+            <div id="discover-load-more-wrap" class="hidden" style="text-align: center; padding: 25px 0 10px 0;">
+                <button id="discover-load-more" type="button">Load More</button>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/theme.js?v=20260308b"></script>
+    <script src="js/discover.js"></script>
+</body>
+</html>

@@ -31,7 +31,7 @@ function populateRow(containerId, movies) {
     }
 
     container.innerHTML = movies.map(movie => `
-        <div class="movie-card" onclick="window.location.href='index.html?movie_id=${movie.id}'">
+        <div class="movie-card" onclick="window.location.href='index.html?movie_id=${movie.id}&ref=regional'">
             <img src="${movie.poster_url || 'https://via.placeholder.com/500x750?text=No+Poster'}" alt="${movie.title}">
             <div class="movie-card-info" style="padding: 10px 0;">
                 <h3 style="margin: 0 0 5px 0; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);">${movie.title}</h3>
