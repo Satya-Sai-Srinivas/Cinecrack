@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineCrack Hub</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="logo">🎬 CineCrack</div>
+        <div class="search-bar">
+            <input type="number" id="movie-id-input" placeholder="Enter TMDb ID (e.g., 811941)">
+            <button onclick="fetchAndShowMovie()">Search</button>
+        </div>
+    </header>
+
+    <main>
+        <section id="home-view">
+            <h2 class="section-title">Now Playing in Theaters</h2>
+            <div class="grid-container" id="now-playing-grid">
+                </div>
+        </section>
+
+        <section id="detail-view" class="hidden">
+            <button class="back-btn" onclick="showHomeView()"><i class="fas fa-arrow-left"></i> Back to Home</button>
+            
+            <div class="hero-section">
+                <img id="movie-poster" src="" alt="Movie Poster">
+                <div class="movie-info">
+                    <h1 id="movie-title">Loading...</h1>
+                    <div class="tags" id="movie-genres"></div>
+                    <div class="release-info">
+                        <p><i class="fas fa-calendar-alt"></i> <strong>Theatrical Release:</strong> <span id="theatre-date"></span></p>
+                        <p><i class="fas fa-tv"></i> <strong>Streaming On:</strong> <span id="ott-platforms"></span></p>
+                    </div>
+                    <h3>Storyline</h3>
+                    <p id="movie-storyline" class="storyline"></p>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="people-section">
+                <h2>Lead Cast</h2>
+                <div class="grid-container" id="cast-grid"></div>
+            </div>
+
+            <div class="people-section">
+                <h2>Key Technicians</h2>
+                <div class="grid-container" id="technician-grid"></div>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
