@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy import Column, Integer, DateTime, Text, text
+from sqlalchemy import Column, Integer, DateTime, Text, text, Index
 from sqlalchemy.dialects.postgresql import JSONB
 from dotenv import load_dotenv
 from sqlalchemy import String
@@ -40,6 +40,15 @@ class SearchHistory(Base):
 
 class MovieEmbedding(Base):
     __tablename__ = "movie_embeddings"
+    __table_args__ = (
+        Index(
+            "ix_movie_embeddings_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_l2_ops"},
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     movie_id = Column(Integer, nullable=False, unique=True, index=True)
@@ -50,7 +59,7 @@ class MovieEmbedding(Base):
 
 async def init_db():
     async with engine.begin() as conn:
-        # await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         await conn.run_sync(Base.metadata.create_all)
 
 async def get_db():

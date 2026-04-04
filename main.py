@@ -1,6 +1,7 @@
 import asyncio
 import httpx
 import os
+import json
 import urllib.parse
 from fastapi import FastAPI, HTTPException, Depends, Query
 from datetime import date
@@ -8,6 +9,7 @@ from typing import List, Optional, Any, Dict
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, HttpUrl, Field
 from datetime import datetime, timedelta
 
@@ -16,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from database import get_db, MovieCache, SearchHistory, init_db
 from contextlib import asynccontextmanager
-from ai_services import generate_embedding, similarity_search_movies, generate_cinematic_reply
+from ai_services import generate_embedding, similarity_search_movies, stream_cinematic_reply
 
 # --- Models Imports ---
 from models import MovieDetailResponse, ReleaseInfo, StreamingPlatform, CastMember, Technician, SocialMediaLinks, WorkReference, PersonDetailResponse, MovieCredit
@@ -132,7 +134,7 @@ class ConversationTurn(BaseModel):
 
 
 class AIChatRequest(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1, max_length=1000)
     conversation_history: Optional[List[ConversationTurn]] = None
 
 
@@ -150,41 +152,85 @@ class AIChatResponse(BaseModel):
 
 
 async def hydrate_ai_movie_cards(
+    db: AsyncSession,
     movie_records: List[Any],
 ) -> List[AIRecommendedMovie]:
-    cards: List[AIRecommendedMovie] = []
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        for movie in movie_records:
-            poster_url = None
-            release_date_value = None
-            try:
-                response = await client.get(
-                    f"{BASE_URL}/movie/{movie.movie_id}",
-                    headers=HEADERS,
-                    params=AUTH_PARAMS,
-                )
-                if response.status_code == 200:
-                    payload = response.json()
-                    poster_path = payload.get("poster_path")
-                    poster_url = (
-                        f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
-                    )
-                    release_date_value = safe_parse_date(payload.get("release_date"))
-            except httpx.HTTPError:
-                poster_url = None
-                release_date_value = None
+    if not movie_records:
+        return []
 
-            cards.append(
-                AIRecommendedMovie(
-                    id=movie.movie_id,
-                    title=movie.title,
-                    storyline=movie.storyline,
-                    poster_url=poster_url,
-                    release_date=release_date_value,
-                )
+    ordered_movie_ids = [movie.movie_id for movie in movie_records]
+    lookup_by_id = {movie.movie_id: movie for movie in movie_records}
+
+    cache_result = await db.execute(
+        select(MovieCache).where(MovieCache.movie_id.in_(ordered_movie_ids))
+    )
+    cached_entries = {entry.movie_id: entry.movie_data for entry in cache_result.scalars().all()}
+
+    async def fetch_tmdb_movie_card(
+        client: httpx.AsyncClient, movie_id: int
+    ) -> Dict[str, Optional[str]]:
+        try:
+            response = await client.get(
+                f"{BASE_URL}/movie/{movie_id}",
+                headers=HEADERS,
+                params=AUTH_PARAMS,
             )
+            if response.status_code == 200:
+                payload = response.json()
+                return {
+                    "poster_url": (
+                        f"https://image.tmdb.org/t/p/w500{payload['poster_path']}"
+                        if payload.get("poster_path")
+                        else None
+                    ),
+                    "release_date": payload.get("release_date"),
+                }
+        except httpx.HTTPError:
+            pass
+        return {"poster_url": None, "release_date": None}
+
+    missing_ids = [movie_id for movie_id in ordered_movie_ids if movie_id not in cached_entries]
+    fetched_cards: Dict[int, Dict[str, Optional[str]]] = {}
+    if missing_ids:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            tasks = [fetch_tmdb_movie_card(client, movie_id) for movie_id in missing_ids]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for movie_id, payload in zip(missing_ids, results):
+                if isinstance(payload, Exception):
+                    fetched_cards[movie_id] = {"poster_url": None, "release_date": None}
+                else:
+                    fetched_cards[movie_id] = payload
+
+    cards: List[AIRecommendedMovie] = []
+    for movie_id in ordered_movie_ids:
+        movie = lookup_by_id[movie_id]
+        cached_data = cached_entries.get(movie_id)
+
+        if cached_data:
+            poster_url = cached_data.get("poster_url")
+            release_date_raw = (
+                (cached_data.get("release_details") or {}).get("theatrical_release_date")
+            )
+        else:
+            fetched = fetched_cards.get(movie_id, {})
+            poster_url = fetched.get("poster_url")
+            release_date_raw = fetched.get("release_date")
+
+        cards.append(
+            AIRecommendedMovie(
+                id=movie.movie_id,
+                title=movie.title,
+                storyline=movie.storyline,
+                poster_url=poster_url,
+                release_date=safe_parse_date(release_date_raw),
+            )
+        )
 
     return cards
+
+
+def _sse_event(payload: Dict[str, Any]) -> str:
+    return f"data: {json.dumps(payload)}\n\n"
 
 # --- 4. API Endpoints ---
 @app.get("/api/v1/movies/now-playing", response_model=List[MoviePreview])
@@ -300,11 +346,8 @@ async def discover_movies(
         return movies
 
 
-@app.post("/api/v1/ai/chat", response_model=AIChatResponse)
+@app.post("/api/v1/ai/chat")
 async def ai_chat(payload: AIChatRequest, db: AsyncSession = Depends(get_db)):
-    if not payload.query or not payload.query.strip():
-        raise HTTPException(status_code=400, detail="Query must not be empty.")
-
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(
             status_code=500,
@@ -319,32 +362,45 @@ async def ai_chat(payload: AIChatRequest, db: AsyncSession = Depends(get_db)):
     if not query_embedding:
         raise HTTPException(status_code=400, detail="Unable to generate embedding from query.")
 
-    retrieved_movies = await similarity_search_movies(db, query_embedding, top_k=5)
-    if not retrieved_movies:
-        return AIChatResponse(
-            message=(
-                "I could not find enough cinematic memory yet. Seed embeddings first, then ask again "
-                "and I will craft a richer recommendation."
-            ),
-            recommendations=[],
-        )
+    retrieved_movies = await similarity_search_movies(
+        db=db,
+        raw_query=payload.query,
+        query_embedding=query_embedding,
+        top_k=5,
+    )
+    hydrated_recommendations = await hydrate_ai_movie_cards(db, retrieved_movies)
 
     history_payload: Optional[List[Dict[str, str]]] = None
     if payload.conversation_history:
         history_payload = [turn.model_dump() for turn in payload.conversation_history]
 
-    try:
-        ai_message = await generate_cinematic_reply(
-            query=payload.query,
-            conversation_history=history_payload,
-            retrieved_movies=retrieved_movies,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Chat completion failed: {exc}") from exc
+    async def event_generator():
+        try:
+            if not retrieved_movies:
+                fallback = (
+                    "I could not find enough cinematic memory yet. Seed embeddings first, then ask again "
+                    "and I will craft a richer recommendation."
+                )
+                yield _sse_event({"type": "text", "content": fallback})
+            else:
+                async for stream_chunk in stream_cinematic_reply(
+                    query=payload.query,
+                    conversation_history=history_payload,
+                    retrieved_movies=retrieved_movies,
+                ):
+                    yield _sse_event(stream_chunk)
 
-    movie_cards = await hydrate_ai_movie_cards(retrieved_movies)
+            yield _sse_event(
+                {
+                    "type": "recommendations",
+                    "items": [item.model_dump(mode="json") for item in hydrated_recommendations],
+                }
+            )
+            yield _sse_event({"type": "done"})
+        except Exception as exc:
+            yield _sse_event({"type": "error", "message": f"Streaming failed: {exc}"})
 
-    return AIChatResponse(message=ai_message, recommendations=movie_cards)
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 # 🌟 MOVED UP: regional-hub must be above {movie_id} to prevent path collision
 @app.get("/api/v1/movies/regional-hub")

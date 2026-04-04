@@ -193,6 +193,27 @@ function initDiscoverPage() {
         loadMoreButton.addEventListener("click", loadMoreDiscoverResults);
     }
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const genreFromUrl = urlParams.get("genre");
+    const yearMinFromUrl = urlParams.get("year_min");
+    const yearMaxFromUrl = urlParams.get("year_max");
+    const minRatingFromUrl = urlParams.get("min_rating");
+    const genreSelect = document.getElementById("genre-select");
+
+    if (genreSelect && genreFromUrl) {
+        genreSelect.value = genreFromUrl;
+    }
+    if (yearMin && yearMinFromUrl) {
+        yearMin.value = yearMinFromUrl;
+    }
+    if (yearMax && yearMaxFromUrl) {
+        yearMax.value = yearMaxFromUrl;
+    }
+    if (ratingMin && minRatingFromUrl) {
+        ratingMin.value = minRatingFromUrl;
+    }
+    syncSliderLabels();
+
     applyDiscoverFilters();
 }
 

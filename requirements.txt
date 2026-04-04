@@ -22,4 +22,3 @@ openai
 langchain
 langchain-openai
 pgvector
-psycopg2-binary
