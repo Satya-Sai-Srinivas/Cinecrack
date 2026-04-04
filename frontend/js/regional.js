@@ -1,5 +1,4 @@
-// FIXED: Now specifically targets your Python backend on port 8000
-const API_BASE_URL = "http://127.0.0.1:8000/api/v1/movies/regional-hub";
+const API_BASE_URL = "/api/v1/movies/regional-hub";
 
 async function loadHubData() {
     try {

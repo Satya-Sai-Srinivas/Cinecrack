@@ -1,4 +1,4 @@
-const AI_API_URL = "http://127.0.0.1:8000/api/v1/ai/chat";
+const AI_API_URL = "/api/v1/ai/chat";
 const CHAT_HISTORY_KEY = "cinecrack-chat-history";
 const CHAT_OPEN_KEY = "cinecrack-chat-open";
 

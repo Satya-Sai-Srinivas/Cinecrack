@@ -60,8 +60,8 @@ class MovieDetailResponse(BaseModel):
     storyline: str
     genres: List[str]
     poster_url: Optional[HttpUrl] = None
-    trailer_url: Optional[HttpUrl] = None
-    wikipedia_url: Optional[HttpUrl] = None
+    trailer_url: Optional[str] = None
+    wikipedia_url: Optional[str] = None
     
     release_details: ReleaseInfo
     ratings_and_reviews: List[Review] = Field(default_factory=list)

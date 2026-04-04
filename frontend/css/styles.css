@@ -217,7 +217,7 @@ body {
 
 /* --- SEARCH BAR --- */
 .search-bar { display: flex; gap: 10px; }
-input { 
+.search-bar input { 
     padding: 12px 20px; 
     border-radius: 25px; 
     border: 1px solid var(--border-color); 
@@ -228,8 +228,8 @@ input {
     outline: none; 
     transition: border 0.3s; 
 }
-input:focus { border-color: var(--accent); }
-button { 
+.search-bar input:focus { border-color: var(--accent); }
+.search-bar button { 
     padding: 12px 28px; 
     border-radius: 25px; 
     border: none; 
@@ -239,7 +239,7 @@ button {
     font-weight: 600; 
     transition: transform 0.2s, background-color 0.2s; 
 }
-button:hover { background-color: var(--accent-hover); transform: scale(1.05); }
+.search-bar button:hover { background-color: var(--accent-hover); transform: scale(1.05); }
 
 /* --- MARKET TOGGLES & FILTERS --- */
 .market-toggle { display: flex; gap: 8px; background: var(--surface); padding: 6px; border-radius: 30px; border: 1px solid var(--border-color); }
@@ -255,8 +255,8 @@ button:hover { background-color: var(--accent-hover); transform: scale(1.05); }
 /* --- DISCOVER FILTERS --- */
 .discover-toolbar {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
     margin-bottom: 28px;
     padding: 18px;
     border: 1px solid var(--border-color);
@@ -268,6 +268,7 @@ button:hover { background-color: var(--accent-hover); transform: scale(1.05); }
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-width: 0;
 }
 
 .discover-control label {
@@ -311,6 +312,23 @@ button:hover { background-color: var(--accent-hover); transform: scale(1.05); }
     cursor: pointer;
 }
 
+.discover-control input[type="range"].invalid-range {
+    background: #f97316;
+}
+
+.discover-range-error {
+    margin-top: -8px;
+    margin-bottom: 20px;
+    color: #ef4444;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.discover-sentinel {
+    width: 100%;
+    height: 10px;
+}
+
 .discover-control select {
     padding: 10px 12px;
     border-radius: 10px;
@@ -323,11 +341,6 @@ button:hover { background-color: var(--accent-hover); transform: scale(1.05); }
     font-size: 13px;
     color: var(--text-main);
     font-weight: 600;
-}
-
-.discover-actions {
-    display: flex;
-    align-items: flex-end;
 }
 
 .discover-empty {
@@ -387,14 +400,14 @@ hr { border: none; height: 1px; background: var(--border-color); margin: 60px 0;
 .release-info p { margin: 8px 0; font-size: 15px; }
 .storyline { line-height: 1.8; color: var(--text-muted); font-size: 17px; max-width: 800px; }
 
-.movie-action-links {
+.movie-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 22px;
 }
 
-.movie-action-link {
+.action-btn {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -407,13 +420,9 @@ hr { border: none; height: 1px; background: var(--border-color); margin: 60px 0;
     color: var(--text-main);
 }
 
-.movie-action-link:hover {
+.action-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 18px rgba(2, 132, 199, 0.2);
-}
-
-.movie-action-link.trailer {
-    background: color-mix(in srgb, var(--accent) 18%, var(--surface));
 }
 
 /* --- PEOPLE CARDS --- */
@@ -444,88 +453,6 @@ hr { border: none; height: 1px; background: var(--border-color); margin: 60px 0;
 .movie-row { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; padding-left: 5px; scroll-behavior: smooth; scroll-snap-type: x mandatory; -ms-overflow-style: none; scrollbar-width: none; }
 .movie-row::-webkit-scrollbar { display: none; }
 .movie-row .movie-card { min-width: 160px; max-width: 160px; scroll-snap-align: start; }
-
-/* --- AI GURU PAGE --- */
-.ai-guru-shell {
-    border-radius: 24px;
-    padding: 24px;
-    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-color) 65%);
-    background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(20px);
-    box-shadow: 0 25px 60px rgba(2, 6, 23, 0.28);
-}
-
-:root[data-theme="light"] .ai-guru-shell {
-    background: rgba(255, 255, 255, 0.72);
-    box-shadow: 0 20px 45px rgba(2, 132, 199, 0.12);
-}
-
-.ai-chat-thread {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    max-height: 66vh;
-    overflow-y: auto;
-    padding-right: 6px;
-    margin-bottom: 20px;
-}
-
-.chat-message {
-    display: flex;
-}
-
-.chat-bubble {
-    max-width: min(82%, 900px);
-    padding: 14px 16px;
-    border-radius: 16px;
-    position: relative;
-    border: 1px solid var(--border-color);
-    background: color-mix(in srgb, var(--surface) 92%, transparent);
-}
-
-.chat-bubble p {
-    margin: 0;
-    line-height: 1.7;
-    color: var(--text-main);
-}
-
-.ai-message {
-    justify-content: flex-start;
-}
-
-.ai-message .chat-bubble {
-    border: 1px solid transparent;
-    background:
-        linear-gradient(var(--surface), var(--surface)) padding-box,
-        linear-gradient(125deg, color-mix(in srgb, var(--accent) 85%, #ffffff 15%), transparent 55%, var(--accent)) border-box;
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent), 0 0 22px rgba(56, 189, 248, 0.15);
-}
-
-.user-message {
-    justify-content: flex-end;
-}
-
-.user-message .chat-bubble {
-    background: color-mix(in srgb, var(--accent) 18%, var(--surface));
-}
-
-.ai-chat-form {
-    display: flex;
-    gap: 12px;
-    align-items: flex-end;
-}
-
-.ai-query-input {
-    width: 100%;
-    min-height: 52px;
-    max-height: 180px;
-    border-radius: 16px;
-    padding: 14px 16px;
-    resize: none;
-    font-family: inherit;
-    font-size: 15px;
-    line-height: 1.45;
-}
 
 .cinematic-loader {
     width: 54px;
@@ -824,7 +751,7 @@ hr { border: none; height: 1px; background: var(--border-color); margin: 60px 0;
 @media (max-width: 900px) {
     .layout { flex-direction: column; }
     .sidebar { width: 100%; height: auto; position: sticky; top: 0; flex-direction: row; justify-content: space-between; align-items: center; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-    .sidebar nav { flex-direction: row; }
+    .sidebar nav { flex-direction: row; flex-wrap: wrap; }
     .sidebar-top { width: 100%; }
     .nav-link { padding: 10px 15px; }
     .main-content { margin-left: 0; padding: 20px; }
@@ -854,5 +781,15 @@ hr { border: none; height: 1px; background: var(--border-color); margin: 60px 0;
         bottom: 86px;
         width: calc(100vw - 28px);
         height: min(72vh, 560px);
+    }
+}
+
+@media (max-width: 768px) {
+    .discover-toolbar {
+        grid-template-columns: 1fr; /* Stack filters vertically on small screens */
+        gap: 15px;
+    }
+    .discover-control {
+        width: 100%;
     }
 }

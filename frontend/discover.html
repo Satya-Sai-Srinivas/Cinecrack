@@ -21,7 +21,7 @@
     </script>
     <title>Discover - CineCrack</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/styles.css?v=20260315d">
+    <link rel="stylesheet" href="css/styles.css?v=20260315f">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -54,7 +54,7 @@
                 Filter by genre, release year range, and minimum user rating.
             </p>
 
-            <form id="discover-form" class="discover-toolbar">
+            <section class="discover-toolbar" aria-label="Discover filters">
                 <div class="discover-control">
                     <label for="genre-select">Genre</label>
                     <select id="genre-select">
@@ -96,22 +96,18 @@
                     <span id="rating-min-value" class="slider-value">6.5</span>
                 </div>
 
-                <div class="discover-actions">
-                    <button type="submit"><i class="fas fa-sliders-h"></i> Apply Filters</button>
-                </div>
-            </form>
+            </section>
+            <p id="discover-range-error" class="discover-range-error hidden">Release year "From" must be less than or equal to "To".</p>
 
             <h2 class="section-title" style="margin-bottom: 18px;">Discover Results</h2>
             <div class="grid-container" id="discover-grid"></div>
             <p id="discover-empty" class="discover-empty hidden">No movies matched your filters. Try widening the range.</p>
-            <div id="discover-load-more-wrap" class="hidden" style="text-align: center; padding: 25px 0 10px 0;">
-                <button id="discover-load-more" type="button">Load More</button>
-            </div>
+            <div id="discover-sentinel" class="discover-sentinel" aria-hidden="true"></div>
         </main>
     </div>
 
-    <script src="js/theme.js?v=20260315c"></script>
-    <script src="js/discover.js?v=20260315c"></script>
-    <script src="js/chatbot.js?v=20260315d"></script>
+    <script src="js/theme.js?v=20260315e"></script>
+    <script src="js/discover.js?v=20260315e"></script>
+    <script src="js/chatbot.js?v=20260315e"></script>
 </body>
 </html>

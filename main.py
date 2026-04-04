@@ -91,10 +91,9 @@ def build_movie_wikipedia_url(
     normalized_wikidata = (wikidata_id or "").strip()
     normalized_imdb = (imdb_id or "").strip()
 
-    # Only use Special:EntityPage when value is a valid Wikidata entity ID.
+    # Prefer Wikidata-driven redirect to the canonical English Wikipedia page.
     if re.fullmatch(r"Q\d+", normalized_wikidata):
-        # Wikipedia supports entity redirects from Wikidata IDs.
-        return f"https://en.wikipedia.org/wiki/Special:EntityPage/{normalized_wikidata}"
+        return f"https://www.wikidata.org/wiki/Special:GoToLinkedPage/enwiki/{normalized_wikidata}"
 
     if re.fullmatch(r"tt\d+", normalized_imdb):
         return f"https://en.wikipedia.org/wiki/Special:Search?search={urllib.parse.quote(normalized_imdb)}"
@@ -103,6 +102,40 @@ def build_movie_wikipedia_url(
         return f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
 
     return None
+
+
+def pick_youtube_video_url(video_items: List[Dict[str, Any]]) -> Optional[str]:
+    youtube_items = [v for v in video_items if v.get("site") == "YouTube" and v.get("key")]
+    if not youtube_items:
+        return None
+
+    def rank(video: Dict[str, Any]) -> tuple:
+        return (
+            1 if video.get("official") else 0,
+            video.get("published_at") or "",
+        )
+
+    trailers = [v for v in youtube_items if v.get("type") == "Trailer"]
+    if trailers:
+        trailers.sort(key=rank, reverse=True)
+        return f"https://www.youtube.com/watch?v={trailers[0]['key']}"
+
+    teasers = [v for v in youtube_items if v.get("type") == "Teaser"]
+    if teasers:
+        teasers.sort(key=rank, reverse=True)
+        return f"https://www.youtube.com/watch?v={teasers[0]['key']}"
+
+    youtube_items.sort(key=rank, reverse=True)
+    return f"https://www.youtube.com/watch?v={youtube_items[0]['key']}"
+
+
+def build_streaming_platforms(results_data: Dict[str, Any], movie_id: int, region: str) -> List[StreamingPlatform]:
+    local_providers = results_data.get(region.upper(), {}) if isinstance(results_data, dict) else {}
+    tmdb_url = f"https://www.themoviedb.org/movie/{movie_id}/watch?region={region.upper()}"
+    return [
+        StreamingPlatform(name=p.get("provider_name", "Unknown"), link=tmdb_url)
+        for p in local_providers.get("flatrate", [])
+    ]
 
 
 async def fetch_person_data(client: httpx.AsyncClient, person: dict, is_cast: bool) -> Any:
@@ -484,16 +517,54 @@ async def get_regional_hub():
 
 
 @app.get("/api/v1/movies/{movie_id}", response_model=MovieDetailResponse)
-async def get_movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
+async def get_movie_details(movie_id: int, region: str = "US", db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(MovieCache).where(MovieCache.movie_id == movie_id))
     cached_movie = result.scalars().first()
     
     movie_title = ""
     final_response_data = None
+    normalized_region = (region or "US").upper()
 
     if cached_movie:
-        final_response_data = cached_movie.movie_data
+        final_response_data = dict(cached_movie.movie_data)
         movie_title = final_response_data.get("title", "Unknown Title")
+
+        async with httpx.AsyncClient() as client:
+            providers_response = await client.get(
+                f"{BASE_URL}/movie/{movie_id}/watch/providers",
+                headers=HEADERS,
+                params=AUTH_PARAMS,
+            )
+            if providers_response.status_code == 200:
+                providers_data = providers_response.json() or {}
+                results_data = providers_data.get("results") or {}
+                local_streaming_platforms = build_streaming_platforms(results_data, movie_id, normalized_region)
+                release_details = final_response_data.get("release_details") or {}
+                release_details["available_on"] = [p.model_dump(mode="json") for p in local_streaming_platforms]
+                final_response_data["release_details"] = release_details
+
+            # Backfill missing trailer/wiki for older cached records.
+            needs_media_links = not final_response_data.get("trailer_url") or not final_response_data.get("wikipedia_url")
+            if needs_media_links:
+                media_response = await client.get(
+                    f"{BASE_URL}/movie/{movie_id}",
+                    headers=HEADERS,
+                    params={"append_to_response": "videos,external_ids", **AUTH_PARAMS},
+                )
+                if media_response.status_code == 200:
+                    media_data = media_response.json() or {}
+                    videos_data = media_data.get("videos") or {}
+                    external_ids = media_data.get("external_ids") or {}
+                    if not final_response_data.get("trailer_url"):
+                        final_response_data["trailer_url"] = pick_youtube_video_url(videos_data.get("results", []))
+                    if not final_response_data.get("wikipedia_url"):
+                        final_response_data["wikipedia_url"] = build_movie_wikipedia_url(
+                            title=movie_title,
+                            wikidata_id=external_ids.get("wikidata_id"),
+                            imdb_id=external_ids.get("imdb_id"),
+                        )
+
+        cached_movie.movie_data = final_response_data
     else:
         url = f"{BASE_URL}/movie/{movie_id}"
         params = {"append_to_response": "credits,watch/providers,videos,external_ids", **AUTH_PARAMS}
@@ -512,24 +583,10 @@ async def get_movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
             
             providers_data = movie_data.get("watch/providers") or {}
             results_data = providers_data.get("results") or {}
-            us_providers = results_data.get("US") or {}
+            local_streaming_platforms = build_streaming_platforms(results_data, movie_id, normalized_region)
 
             videos_data = movie_data.get("videos") or {}
-            trailer_candidates = [
-                v for v in videos_data.get("results", [])
-                if v.get("site") == "YouTube" and v.get("type") == "Trailer" and v.get("key")
-            ]
-            trailer_candidates.sort(
-                key=lambda item: (
-                    1 if item.get("official") else 0,
-                    item.get("published_at") or "",
-                ),
-                reverse=True,
-            )
-            trailer_url = (
-                f"https://www.youtube.com/watch?v={trailer_candidates[0]['key']}"
-                if trailer_candidates else None
-            )
+            trailer_url = pick_youtube_video_url(videos_data.get("results", []))
 
             external_ids = movie_data.get("external_ids") or {}
             wikipedia_url = build_movie_wikipedia_url(
@@ -537,16 +594,10 @@ async def get_movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
                 wikidata_id=external_ids.get("wikidata_id"),
                 imdb_id=external_ids.get("imdb_id"),
             )
-            
-            tmdb_url = f"https://www.themoviedb.org/movie/{movie_id}/watch"
-            streaming_platforms = [
-                StreamingPlatform(name=p.get("provider_name", "Unknown"), link=tmdb_url) 
-                for p in us_providers.get("flatrate", [])
-            ]
-            
+
             release_info = ReleaseInfo(
                 theatrical_release_date=safe_parse_date(movie_data.get("release_date")), 
-                available_on=streaming_platforms
+                available_on=local_streaming_platforms
             )
 
             credits_data = movie_data.get("credits") or {}

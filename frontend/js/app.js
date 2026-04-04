@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://127.0.0.1:8000/api/v1/movies";
+const API_BASE_URL = "/api/v1/movies";
 
 let currentRegion = 'US';
 let currentLang = 'all';
@@ -272,7 +272,7 @@ function resetToHome() {
 
 async function loadHistory() {
     try {
-        const response = await fetch(`http://127.0.0.1:8000/api/v1/history`);
+        const response = await fetch(`/api/v1/history`);
         if (!response.ok) throw new Error("Failed to load history");
         
         const history = await response.json();
@@ -354,7 +354,7 @@ async function fetchAndShowMovie(movieId = null, options = {}) {
 
     showLoading(); 
     try {
-        const response = await fetch(`${API_BASE_URL}/${movieId}`);
+        const response = await fetch(`${API_BASE_URL}/${movieId}?region=${encodeURIComponent(currentRegion || "US")}`);
         if (!response.ok) throw new Error("Movie not found");
         
         const movie = await response.json();
@@ -386,17 +386,17 @@ function renderMovieDetails(movie) {
         ottContainer.textContent = "Not currently available to stream.";
     }
 
-    const actionContainer = document.getElementById('movie-action-links');
+    const actionContainer = document.getElementById('movie-actions');
     if (actionContainer) {
         const links = [];
         if (movie.trailer_url) {
             links.push(
-                `<a class="movie-action-link trailer" href="${movie.trailer_url}" target="_blank" rel="noopener noreferrer"><i class="fas fa-play"></i><span>Watch Trailer</span></a>`
+                `<a href="${movie.trailer_url}" target="_blank" rel="noopener noreferrer" class="action-btn"><i class="fas fa-play"></i><span>Watch Trailer</span></a>`
             );
         }
         if (movie.wikipedia_url) {
             links.push(
-                `<a class="movie-action-link wiki" href="${movie.wikipedia_url}" target="_blank" rel="noopener noreferrer"><i class="fas fa-book-open"></i><span>Read on Wikipedia</span></a>`
+                `<a href="${movie.wikipedia_url}" target="_blank" rel="noopener noreferrer" class="action-btn"><i class="fab fa-wikipedia-w"></i><span>Read on Wikipedia</span></a>`
             );
         }
         actionContainer.innerHTML = links.join('');
@@ -444,8 +444,6 @@ window.onload = async () => {
             setNavContext({ source: 'regional', returnUrl: 'regional.html' });
         } else if (refFromUrl === 'discover') {
             setNavContext({ source: 'discover', returnUrl: 'discover.html' });
-        } else if (refFromUrl === 'ai-guru') {
-            setNavContext({ source: 'ai-guru', returnUrl: 'index.html' });
         } else if (refFromUrl === 'chatbot') {
             setNavContext({
                 source: 'chatbot',
