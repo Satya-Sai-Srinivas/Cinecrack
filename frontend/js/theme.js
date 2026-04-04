@@ -1,4 +1,5 @@
 const THEME_STORAGE_KEY = "cinecrack-theme";
+const SIDEBAR_STORAGE_KEY = "cinecrack-sidebar-collapsed";
 
 function getPreferredTheme() {
     let savedTheme = null;
@@ -46,6 +47,37 @@ function toggleTheme() {
     applyTheme(nextTheme);
 }
 
+function applySidebarState(collapsed) {
+    const sidebar = document.querySelector(".sidebar");
+    if (!sidebar) return;
+
+    sidebar.classList.toggle("collapsed", collapsed);
+    try {
+        localStorage.setItem(SIDEBAR_STORAGE_KEY, collapsed ? "true" : "false");
+    } catch (error) {
+        // Ignore storage errors while keeping runtime behavior.
+    }
+}
+
+function initSidebarToggle() {
+    const sidebar = document.querySelector(".sidebar");
+    const sidebarToggle = document.getElementById("sidebar-toggle");
+    if (!sidebar || !sidebarToggle) return;
+
+    let collapsed = false;
+    try {
+        collapsed = localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true";
+    } catch (error) {
+        collapsed = false;
+    }
+
+    applySidebarState(collapsed);
+
+    sidebarToggle.addEventListener("click", () => {
+        applySidebarState(!sidebar.classList.contains("collapsed"));
+    });
+}
+
 function initTheme() {
     const initialTheme = document.documentElement.getAttribute("data-theme") || getPreferredTheme();
     applyTheme(initialTheme);
@@ -54,6 +86,12 @@ function initTheme() {
     if (themeToggle) {
         themeToggle.addEventListener("click", toggleTheme);
     }
+
+    initSidebarToggle();
 }
 
-document.addEventListener("DOMContentLoaded", initTheme);
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initTheme);
+} else {
+    initTheme();
+}

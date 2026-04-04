@@ -61,6 +61,7 @@ class MovieDetailResponse(BaseModel):
     genres: List[str]
     poster_url: Optional[HttpUrl] = None
     trailer_url: Optional[HttpUrl] = None
+    wikipedia_url: Optional[HttpUrl] = None
     
     release_details: ReleaseInfo
     ratings_and_reviews: List[Review] = Field(default_factory=list)

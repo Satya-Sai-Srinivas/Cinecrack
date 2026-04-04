@@ -137,13 +137,14 @@ async function discoverMovies() {
 
 function applyDiscoverFilters() {
     const genreSelect = document.getElementById("genre-select");
+    const langSelect = document.getElementById("lang-select");
     const yearMin = document.getElementById("year-min");
     const yearMax = document.getElementById("year-max");
     const ratingMin = document.getElementById("rating-min");
     const grid = document.getElementById("discover-grid");
     const loadMoreWrap = document.getElementById("discover-load-more-wrap");
 
-    if (!genreSelect || !yearMin || !yearMax || !ratingMin || !grid || !loadMoreWrap) return;
+    if (!genreSelect || !langSelect || !yearMin || !yearMax || !ratingMin || !grid || !loadMoreWrap) return;
 
     activeDiscoverFilters = {
         release_year_gte: yearMin.value,
@@ -153,11 +154,23 @@ function applyDiscoverFilters() {
     if (genreSelect.value) {
         activeDiscoverFilters.genre = genreSelect.value;
     }
+    if (langSelect.value) {
+        activeDiscoverFilters.language = langSelect.value;
+    }
 
     discoverPage = 1;
     hasMoreDiscoverResults = true;
     grid.innerHTML = "";
     loadMoreWrap.classList.add("hidden");
+    const nextParams = new URLSearchParams();
+    if (activeDiscoverFilters.genre) nextParams.set("genre", activeDiscoverFilters.genre);
+    if (activeDiscoverFilters.language) nextParams.set("language", activeDiscoverFilters.language);
+    if (activeDiscoverFilters.release_year_gte) nextParams.set("year_min", activeDiscoverFilters.release_year_gte);
+    if (activeDiscoverFilters.release_year_lte) nextParams.set("year_max", activeDiscoverFilters.release_year_lte);
+    if (activeDiscoverFilters.min_rating) nextParams.set("min_rating", activeDiscoverFilters.min_rating);
+    const nextQuery = nextParams.toString();
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`;
+    window.history.replaceState(window.history.state || {}, "", nextUrl);
     discoverMovies();
 }
 
@@ -198,7 +211,9 @@ function initDiscoverPage() {
     const yearMinFromUrl = urlParams.get("year_min");
     const yearMaxFromUrl = urlParams.get("year_max");
     const minRatingFromUrl = urlParams.get("min_rating");
+    const languageFromUrl = urlParams.get("language");
     const genreSelect = document.getElementById("genre-select");
+    const langSelect = document.getElementById("lang-select");
 
     if (genreSelect && genreFromUrl) {
         genreSelect.value = genreFromUrl;
@@ -211,6 +226,9 @@ function initDiscoverPage() {
     }
     if (ratingMin && minRatingFromUrl) {
         ratingMin.value = minRatingFromUrl;
+    }
+    if (langSelect && languageFromUrl) {
+        langSelect.value = languageFromUrl;
     }
     syncSliderLabels();
 

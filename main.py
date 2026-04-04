@@ -3,6 +3,7 @@ import httpx
 import os
 import json
 import urllib.parse
+import re
 from fastapi import FastAPI, HTTPException, Depends, Query
 from datetime import date
 from typing import List, Optional, Any, Dict
@@ -80,6 +81,29 @@ def safe_parse_date(date_string: str) -> Optional[date]:
         return date.fromisoformat(date_string)
     except ValueError:
         return None
+
+
+def build_movie_wikipedia_url(
+    title: str,
+    wikidata_id: Optional[str] = None,
+    imdb_id: Optional[str] = None,
+) -> Optional[str]:
+    normalized_wikidata = (wikidata_id or "").strip()
+    normalized_imdb = (imdb_id or "").strip()
+
+    # Only use Special:EntityPage when value is a valid Wikidata entity ID.
+    if re.fullmatch(r"Q\d+", normalized_wikidata):
+        # Wikipedia supports entity redirects from Wikidata IDs.
+        return f"https://en.wikipedia.org/wiki/Special:EntityPage/{normalized_wikidata}"
+
+    if re.fullmatch(r"tt\d+", normalized_imdb):
+        return f"https://en.wikipedia.org/wiki/Special:Search?search={urllib.parse.quote(normalized_imdb)}"
+
+    if title:
+        return f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
+
+    return None
+
 
 async def fetch_person_data(client: httpx.AsyncClient, person: dict, is_cast: bool) -> Any:
     person_id = person["id"]
@@ -302,6 +326,7 @@ async def search_movies(query: str, page: int = 1):
 @app.get("/api/v1/movies/discover", response_model=List[MoviePreview])
 async def discover_movies(
     genre: Optional[int] = Query(default=None, description="TMDB genre ID"),
+    language: Optional[str] = Query(default=None, min_length=2, max_length=5, description="Original audio language code"),
     release_year_gte: Optional[int] = Query(default=None, ge=1900, le=2100),
     release_year_lte: Optional[int] = Query(default=None, ge=1900, le=2100),
     min_rating: Optional[float] = Query(default=None, ge=0, le=10),
@@ -321,6 +346,8 @@ async def discover_movies(
 
     if genre:
         params["with_genres"] = genre
+    if language:
+        params["with_original_language"] = language
     if release_year_gte:
         params["primary_release_date.gte"] = f"{release_year_gte}-01-01"
     if release_year_lte:
@@ -469,7 +496,7 @@ async def get_movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
         movie_title = final_response_data.get("title", "Unknown Title")
     else:
         url = f"{BASE_URL}/movie/{movie_id}"
-        params = {"append_to_response": "credits,watch/providers", **AUTH_PARAMS}
+        params = {"append_to_response": "credits,watch/providers,videos,external_ids", **AUTH_PARAMS}
         
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=HEADERS, params=params)
@@ -486,6 +513,30 @@ async def get_movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
             providers_data = movie_data.get("watch/providers") or {}
             results_data = providers_data.get("results") or {}
             us_providers = results_data.get("US") or {}
+
+            videos_data = movie_data.get("videos") or {}
+            trailer_candidates = [
+                v for v in videos_data.get("results", [])
+                if v.get("site") == "YouTube" and v.get("type") == "Trailer" and v.get("key")
+            ]
+            trailer_candidates.sort(
+                key=lambda item: (
+                    1 if item.get("official") else 0,
+                    item.get("published_at") or "",
+                ),
+                reverse=True,
+            )
+            trailer_url = (
+                f"https://www.youtube.com/watch?v={trailer_candidates[0]['key']}"
+                if trailer_candidates else None
+            )
+
+            external_ids = movie_data.get("external_ids") or {}
+            wikipedia_url = build_movie_wikipedia_url(
+                title=movie_title,
+                wikidata_id=external_ids.get("wikidata_id"),
+                imdb_id=external_ids.get("imdb_id"),
+            )
             
             tmdb_url = f"https://www.themoviedb.org/movie/{movie_id}/watch"
             streaming_platforms = [
@@ -515,6 +566,8 @@ async def get_movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
                 storyline=movie_data.get("overview", ""),
                 genres=genres,
                 poster_url=poster_url,
+                trailer_url=trailer_url,
+                wikipedia_url=wikipedia_url,
                 release_details=release_info,
                 lead_cast=list(validated_cast),
                 technicians=list(validated_technicians)

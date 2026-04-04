@@ -21,7 +21,7 @@
     </script>
     <title>Cinema Hub - CineCrack</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/styles.css?v=20260308b">
+    <link rel="stylesheet" href="css/styles.css?v=20260315d">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -32,12 +32,16 @@
 
     <div class="layout">
         <aside class="sidebar">
-            <div class="logo" onclick="window.location.href='index.html'">🎬 CineCrack</div>
+            <div class="sidebar-top">
+                <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="Toggle sidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo" onclick="window.location.href='index.html'"><span class="logo-text">CineCrack</span></div>
+            </div>
             <nav>
-                <a href="index.html" class="nav-link"><i class="fas fa-home"></i> Home</a>
-                <a href="regional.html" class="nav-link active"><i class="fas fa-globe-americas"></i> Cinema Hub</a>
-                <a href="discover.html" class="nav-link"><i class="fas fa-compass"></i> Discover</a>
-                <a href="ai-guru.html" class="nav-link"><i class="fas fa-magic"></i> AI Guru</a>
+                <a href="index.html" class="nav-link"><i class="fas fa-home"></i> <span class="nav-label">Home</span></a>
+                <a href="regional.html" class="nav-link active"><i class="fas fa-globe-americas"></i> <span class="nav-label">Cinema Hub</span></a>
+                <a href="discover.html" class="nav-link"><i class="fas fa-compass"></i> <span class="nav-label">Discover</span></a>
             </nav>
             <div class="sidebar-bottom">
                 <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode"></button>
@@ -74,7 +78,8 @@
         </main>
     </div>
 
-    <script src="js/theme.js?v=20260308b"></script>
-    <script src="js/regional.js"></script>
+    <script src="js/theme.js?v=20260315c"></script>
+    <script src="js/regional.js?v=20260315c"></script>
+    <script src="js/chatbot.js?v=20260315d"></script>
 </body>
 </html>

@@ -386,6 +386,22 @@ function renderMovieDetails(movie) {
         ottContainer.textContent = "Not currently available to stream.";
     }
 
+    const actionContainer = document.getElementById('movie-action-links');
+    if (actionContainer) {
+        const links = [];
+        if (movie.trailer_url) {
+            links.push(
+                `<a class="movie-action-link trailer" href="${movie.trailer_url}" target="_blank" rel="noopener noreferrer"><i class="fas fa-play"></i><span>Watch Trailer</span></a>`
+            );
+        }
+        if (movie.wikipedia_url) {
+            links.push(
+                `<a class="movie-action-link wiki" href="${movie.wikipedia_url}" target="_blank" rel="noopener noreferrer"><i class="fas fa-book-open"></i><span>Read on Wikipedia</span></a>`
+            );
+        }
+        actionContainer.innerHTML = links.join('');
+    }
+
     const mapPersonCard = person => `
         <div class="person-card" style="cursor: pointer;" onclick="window.location.href='person.html?id=${person.id}'">
             <img src="${person.image_url || 'https://via.placeholder.com/150x225?text=No+Image'}" alt="${person.name}">
@@ -429,7 +445,12 @@ window.onload = async () => {
         } else if (refFromUrl === 'discover') {
             setNavContext({ source: 'discover', returnUrl: 'discover.html' });
         } else if (refFromUrl === 'ai-guru') {
-            setNavContext({ source: 'ai-guru', returnUrl: 'ai-guru.html' });
+            setNavContext({ source: 'ai-guru', returnUrl: 'index.html' });
+        } else if (refFromUrl === 'chatbot') {
+            setNavContext({
+                source: 'chatbot',
+                returnUrl: returnTo ? decodeURIComponent(returnTo) : 'index.html'
+            });
         } else if (refFromUrl === 'person') {
             setNavContext({
                 source: 'person',
