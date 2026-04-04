@@ -1,106 +1,233 @@
+// Ensure this matches your FastAPI server port
 const API_BASE_URL = "http://127.0.0.1:8000/api/v1/movies";
 
-// --- Navigation Logic ---
+// --- View Toggling & Scroll Fix ---
 function showHomeView() {
-    document.getElementById('detail-view').classList.add('hidden');
     document.getElementById('home-view').classList.remove('hidden');
+    document.getElementById('detail-view').classList.add('hidden');
+    // Scroll to top when going back home
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'instant' }), 10);
 }
 
 function showDetailView() {
     document.getElementById('home-view').classList.add('hidden');
     document.getElementById('detail-view').classList.remove('hidden');
+    // FIXED: Force the browser to scroll to the top AFTER the DOM paints
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'instant' }), 10);
 }
 
-// --- Fetch & Render Homepage ---
-async function loadNowPlaying() {
-    showHomeView();
-    const grid = document.getElementById('now-playing-grid');
-    grid.innerHTML = '<p style="padding: 20px;">Loading latest releases...</p>';
+// --- Loading Spinner Controls ---
+function showLoading() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) overlay.classList.remove('hidden');
+}
 
+function hideLoading() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) overlay.classList.add('hidden');
+}
+
+// --- Fetch & Render Now Playing (Default Homepage) ---
+async function loadNowPlaying() {
+    showLoading(); 
     try {
         const response = await fetch(`${API_BASE_URL}/now-playing`);
-        if (!response.ok) throw new Error("Failed to load now playing movies");
+        if (!response.ok) throw new Error("Failed to load now playing");
         
         const movies = await response.json();
+        const grid = document.getElementById('now-playing-grid');
         
         grid.innerHTML = movies.map(movie => `
             <div class="movie-card" onclick="fetchAndShowMovie(${movie.id})">
-                <img src="${movie.poster_url || 'https://via.placeholder.com/300x450?text=No+Poster'}" alt="${movie.title}">
-                <div class="movie-card-info">
-                    <h3>${movie.title}</h3>
-                    <p>${movie.release_date || 'TBA'}</p>
-                </div>
+                <img src="${movie.poster_url || 'https://via.placeholder.com/500x750?text=No+Poster'}" alt="${movie.title}">
+                <div class="movie-card-title">${movie.title} <br> <span style="font-size: 0.8em; color: #ccc;">(${movie.release_date ? movie.release_date.substring(0,4) : 'N/A'})</span></div>
             </div>
         `).join('');
     } catch (error) {
-        grid.innerHTML = `<p style="color: red; padding: 20px;">${error.message}</p>`;
+        console.error("Error loading now playing:", error);
+        document.getElementById('now-playing-grid').innerHTML = '<p style="color: white; padding: 20px;">Failed to load movies. Is the backend running?</p>';
+    } finally {
+        hideLoading(); 
     }
 }
 
-// --- Fetch & Render Single Movie ---
-async function fetchAndShowMovie(movieId) {
-    if (!movieId) {
-        movieId = document.getElementById('movie-id-input').value;
+// --- Reset to Default Homepage (Logo Click) ---
+function resetToHome() {
+    const searchInput = document.getElementById('movie-search-input');
+    if (searchInput) searchInput.value = '';
+
+    const sectionTitle = document.querySelector('.section-title');
+    if (sectionTitle) sectionTitle.textContent = 'Now Playing in Theaters';
+
+    loadNowPlaying();
+    showHomeView();
+}
+
+// --- Fetch & Render Search History ---
+async function loadHistory() {
+    try {
+        const response = await fetch(`${API_BASE_URL.replace('/movies', '/history')}`);
+        if (!response.ok) throw new Error("Failed to load history");
+        
+        const history = await response.json();
+        const historyContainer = document.getElementById('recent-searches-section');
+        const tagsContainer = document.getElementById('history-tags');
+        
+        if (history.length > 0) {
+            historyContainer.style.display = 'block'; 
+            
+            const uniqueHistory = [];
+            const seenIds = new Set();
+            for (const item of history) {
+                if (!seenIds.has(item.movie_id)) {
+                    seenIds.add(item.movie_id);
+                    uniqueHistory.push(item);
+                }
+            }
+
+            tagsContainer.innerHTML = uniqueHistory.slice(0, 6).map(h => `
+                <span style="cursor: pointer; transition: background 0.3s; padding: 6px 12px; background: rgba(255,255,255,0.1); border-radius: 20px; font-size: 0.9em; color: white;" 
+                      onclick="fetchAndShowMovie(${h.movie_id})"
+                      onmouseover="this.style.background='#e50914'"
+                      onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+                    ${h.movie_title}
+                </span>
+            `).join('');
+        }
+    } catch (error) {
+        console.error("History Error:", error);
     }
-    if (!movieId) return alert("Please enter a Movie ID");
+}
+
+// --- Execute Search by Name ---
+async function executeSearch() {
+    const queryInput = document.getElementById('movie-search-input');
+    const query = queryInput.value.trim();
+    
+    if (!query) return;
+
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`);
+        if (!response.ok) throw new Error("Search failed");
+        
+        const movies = await response.json();
+        const grid = document.getElementById('now-playing-grid');
+        
+        document.querySelector('.section-title').textContent = `Search Results for "${query}"`;
+        
+        if (movies.length === 0) {
+            grid.innerHTML = `<p style="color: white; padding: 20px;">No movies found for "${query}".</p>`;
+        } else {
+            grid.innerHTML = movies.map(movie => `
+                <div class="movie-card" onclick="fetchAndShowMovie(${movie.id})">
+                    <img src="${movie.poster_url || 'https://via.placeholder.com/500x750?text=No+Poster'}" alt="${movie.title}">
+                    <div class="movie-card-title">${movie.title} <br> <span style="font-size: 0.8em; color: #ccc;">(${movie.release_date ? movie.release_date.substring(0,4) : 'N/A'})</span></div>
+                </div>
+            `).join('');
+        }
+
+        showHomeView();
+
+    } catch (error) {
+        console.error("Error searching movies:", error);
+        alert("Failed to search for movies. Please try again.");
+    } finally {
+        hideLoading(); 
+    }
+}
+
+document.getElementById('movie-search-input')?.addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+        executeSearch();
+    }
+});
+
+// --- Fetch & Render Movie Details ---
+async function fetchAndShowMovie(movieId = null) {
+    if (!movieId) return;
+
+    showLoading(); 
 
     try {
         const response = await fetch(`${API_BASE_URL}/${movieId}`);
-        if (!response.ok) throw new Error("Movie not found");
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || "Movie not found");
+        }
         
         const movie = await response.json();
         renderMovieDetails(movie);
         showDetailView();
+        loadHistory(); 
+
     } catch (error) {
-        alert(error.message);
+        console.error("Error:", error);
+        alert("Failed to fetch movie details: " + error.message);
+    } finally {
+        hideLoading(); 
     }
 }
 
+// --- Render the DOM for Details ---
 function renderMovieDetails(movie) {
-    document.getElementById('movie-poster').src = movie.poster_url || 'https://via.placeholder.com/300x450?text=No+Poster';
     document.getElementById('movie-title').textContent = movie.title;
-    document.getElementById('movie-storyline').textContent = movie.storyline;
+    document.getElementById('movie-storyline').textContent = movie.storyline || "No storyline available.";
+    document.getElementById('movie-poster').src = movie.poster_url || 'https://via.placeholder.com/500x750?text=No+Poster';
     
-    const genresContainer = document.getElementById('movie-genres');
-    genresContainer.innerHTML = movie.genres.map(g => `<span>${g}</span>`).join('');
-
-    const release = movie.release_details;
-    document.getElementById('theatre-date').textContent = release.theatrical_release_date || "TBA";
+    document.getElementById('movie-genres').innerHTML = movie.genres.map(g => `<span>${g}</span>`).join('');
     
-    const ottList = release.available_on.map(platform => platform.name).join(', ');
-    document.getElementById('ott-platforms').textContent = ottList || "Not streaming yet";
+    document.getElementById('theatre-date').textContent = movie.release_details.theatrical_release_date || "Unknown";
+    
+    const ottContainer = document.getElementById('ott-platforms');
+    if (movie.release_details.available_on.length > 0) {
+        ottContainer.innerHTML = movie.release_details.available_on.map(p => 
+            `<a href="${p.link}" target="_blank" style="color: var(--accent); text-decoration: none; margin-right: 10px;">${p.name}</a>`
+        ).join('');
+    } else {
+        ottContainer.textContent = "Not currently available to stream.";
+    }
 
-    const castGrid = document.getElementById('cast-grid');
-    castGrid.innerHTML = movie.lead_cast.map(actor => generatePersonCard(actor, actor.character_name)).join('');
+    // FIXED: Now properly mapping the 'well_known_for' arrays for Lead Cast
+    document.getElementById('cast-grid').innerHTML = movie.lead_cast.map(person => {
+        const knownForText = person.well_known_for && person.well_known_for.length > 0 
+            ? person.well_known_for.map(work => `${work.title} (${work.release_year || 'N/A'})`).join(', ')
+            : 'N/A';
 
-    const techGrid = document.getElementById('technician-grid');
-    techGrid.innerHTML = movie.technicians.map(tech => generatePersonCard(tech, tech.job)).join('');
-}
-
-function generatePersonCard(person, roleLabel) {
-    const imgUrl = person.image_url || 'https://via.placeholder.com/100?text=No+Image';
-    let socialsHtml = '';
-    const socials = person.social_handles;
-    if (socials.instagram) socialsHtml += `<a href="${socials.instagram}" target="_blank"><i class="fab fa-instagram"></i></a>`;
-    if (socials.twitter) socialsHtml += `<a href="${socials.twitter}" target="_blank"><i class="fab fa-twitter"></i></a>`;
-    if (socials.facebook) socialsHtml += `<a href="${socials.facebook}" target="_blank"><i class="fab fa-facebook"></i></a>`;
-    if (socials.imdb) socialsHtml += `<a href="${socials.imdb}" target="_blank"><i class="fab fa-imdb"></i></a>`;
-
-    const knownForText = person.well_known_for.map(work => work.title).join(', ');
-
-    return `
+        return `
         <div class="person-card">
-            <img src="${imgUrl}" alt="${person.name}">
-            <h3>${person.name}</h3>
-            <span class="role">${roleLabel}</span>
-            <div class="social-links">${socialsHtml}</div>
-            <div class="known-for">
-                <strong>Known For:</strong><br>
-                ${knownForText || "N/A"}
+            <img src="${person.image_url || 'https://via.placeholder.com/150x225?text=No+Image'}" alt="${person.name}">
+            <div class="person-info">
+                <h4>${person.name}</h4>
+                <p style="margin-bottom: 5px;"><strong>Role:</strong> ${person.character_name}</p>
+                <p style="font-size: 0.8em; color: #a0a0a0; line-height: 1.4;"><strong>Known For:</strong><br>${knownForText}</p>
             </div>
         </div>
-    `;
+        `;
+    }).join('');
+
+    // FIXED: Now properly mapping the 'well_known_for' arrays for Technicians
+    document.getElementById('technician-grid').innerHTML = movie.technicians.map(person => {
+        const knownForText = person.well_known_for && person.well_known_for.length > 0 
+            ? person.well_known_for.map(work => `${work.title} (${work.release_year || 'N/A'})`).join(', ')
+            : 'N/A';
+
+        return `
+        <div class="person-card">
+            <img src="${person.image_url || 'https://via.placeholder.com/150x225?text=No+Image'}" alt="${person.name}">
+            <div class="person-info">
+                <h4>${person.name}</h4>
+                <p style="margin-bottom: 5px;"><strong>Job:</strong> ${person.job}</p>
+                <p style="font-size: 0.8em; color: #a0a0a0; line-height: 1.4;"><strong>Known For:</strong><br>${knownForText}</p>
+            </div>
+        </div>
+        `;
+    }).join('');
 }
 
-// Load the homepage grid on startup
-window.onload = loadNowPlaying;
+// --- App Initialization ---
+window.onload = () => {
+    loadNowPlaying();
+    loadHistory();
+};

@@ -12,7 +12,8 @@ class SocialMediaLinks(BaseModel):
 
 class WorkReference(BaseModel):
     title: str = Field(..., description="Title of the movie/show they are known for")
-    release_year: int
+    # FIXED: Added Optional so Pydantic doesn't reject movies missing a release date
+    release_year: Optional[int] = Field(None, description="Year of release")
     platform_link: Optional[HttpUrl] = Field(None, description="Where to stream this previous work")
 
 # --- People (Cast & Crew) ---

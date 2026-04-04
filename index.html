@@ -9,16 +9,29 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <div id="loading-overlay" class="hidden">
+        <div class="spinner"></div>
+        <p>Fetching movies...</p>
+    </div>
     <header>
-        <div class="logo" onclick="showHomeView()">🎬 CineCrack</div>
+        <div class="logo" onclick="resetToHome()" style="cursor: pointer;">🎬 CineCrack</div>
         <div class="search-bar">
-            <input type="number" id="movie-id-input" placeholder="Enter TMDb ID (e.g., 811941)">
-            <button onclick="fetchAndShowMovie()">Search</button>
+            <input type="text" id="movie-search-input" placeholder="Search for a movie (e.g., Inception)">
+            <button onclick="executeSearch()">Search</button>
         </div>
     </header>
 
     <main>
         <section id="home-view">
+            
+            <div class="recent-searches-container" id="recent-searches-section" style="display: none; padding-bottom: 20px;">
+                <h3 style="margin-bottom: 15px; color: #a0a0a0; font-weight: 600;">
+                    <i class="fas fa-history"></i> Recent Searches
+                </h3>
+                <div class="tags" id="history-tags" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 30px;">
+                    </div>
+            </div>
+
             <h2 class="section-title">Now Playing in Theaters</h2>
             <div class="grid-container" id="now-playing-grid">
                 </div>
