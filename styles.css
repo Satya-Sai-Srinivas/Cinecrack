@@ -1,81 +1,209 @@
 :root {
-    --bg-color: #121212;
-    --card-bg: #1e1e1e;
+    --bg-color: #0b0c10; /* Deep cinematic black */
+    --card-bg: #1f2833;
     --text-main: #ffffff;
-    --text-muted: #aaaaaa;
-    --accent: #e50914;
+    --text-muted: #9ca3af;
+    --accent: #e50914; /* Streaming Red */
+    --accent-hover: #f40612;
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Inter', sans-serif;
     background-color: var(--bg-color);
     color: var(--text-main);
     margin: 0;
     padding: 0;
+    -webkit-font-smoothing: antialiased;
 }
 
+/* --- HEADER --- */
 header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px 40px;
-    background-color: #000;
+    padding: 20px 50px;
+    background-color: rgba(11, 12, 16, 0.85);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.logo { font-size: 24px; font-weight: bold; color: var(--accent); }
-input { padding: 10px; border-radius: 4px; border: none; width: 250px; }
-button { padding: 10px 20px; border-radius: 4px; border: none; background-color: var(--accent); color: white; cursor: pointer; font-weight: bold; }
-
-main { padding: 40px; max-width: 1200px; margin: auto; }
-.hidden { display: none; }
-
-.hero-section {
-    display: flex;
-    gap: 40px;
-    margin-bottom: 40px;
+.logo { 
+    font-size: 28px; 
+    font-weight: 800; 
+    color: var(--accent); 
+    letter-spacing: -0.5px; 
+    cursor: pointer; 
 }
 
-#movie-poster { width: 300px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-
-.tags span {
-    background-color: #333;
-    padding: 5px 12px;
-    border-radius: 20px;
-    font-size: 14px;
-    margin-right: 10px;
+/* --- SEARCH BAR --- */
+.search-bar { display: flex; gap: 12px; }
+input { 
+    padding: 12px 20px; 
+    border-radius: 25px; 
+    border: 1px solid rgba(255,255,255,0.2); 
+    background-color: rgba(255,255,255,0.05); 
+    color: white; 
+    width: 280px; 
+    font-size: 14px; 
+    outline: none; 
+    transition: border 0.3s, background-color 0.3s; 
+}
+input:focus { 
+    border-color: var(--accent); 
+    background-color: rgba(255,255,255,0.1); 
+}
+button { 
+    padding: 12px 28px; 
+    border-radius: 25px; 
+    border: none; 
+    background-color: var(--accent); 
+    color: white; 
+    cursor: pointer; 
+    font-weight: 600; 
+    transition: transform 0.2s, background-color 0.2s; 
+}
+button:hover { 
+    background-color: var(--accent-hover); 
+    transform: scale(1.05); 
 }
 
-.release-info { background-color: var(--card-bg); padding: 15px; border-radius: 8px; margin: 20px 0; }
-.storyline { line-height: 1.6; color: var(--text-muted); }
+/* --- MAIN CONTAINER --- */
+main { padding: 50px; max-width: 1400px; margin: auto; }
+.hidden { display: none !important; }
 
-hr { border: 1px solid #333; margin: 40px 0; }
+.section-title { 
+    font-size: 32px; 
+    font-weight: 700; 
+    margin-bottom: 40px; 
+}
 
-.people-section h2 { margin-bottom: 20px; border-left: 4px solid var(--accent); padding-left: 10px; }
-
+/* --- MOVIE POSTER GRID --- */
 .grid-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 20px;
+    /* This automatically sizes columns and guarantees breathing room */
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 35px;
 }
 
-.person-card {
-    background-color: var(--card-bg);
-    border-radius: 10px;
-    padding: 20px;
-    text-align: center;
+.movie-card {
+    background-color: transparent;
+    cursor: pointer;
+    transition: transform 0.3s ease;
 }
 
-.person-card img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
+.movie-card:hover {
+    transform: translateY(-8px) scale(1.02);
+}
+
+.movie-card img {
+    width: 100%;
+    aspect-ratio: 2 / 3; /* Forces standard movie poster size */
     object-fit: cover;
-    margin-bottom: 15px;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+    transition: box-shadow 0.3s ease;
 }
 
-.role { color: var(--accent); font-size: 14px; margin-bottom: 10px; display: block; }
-.known-for { font-size: 12px; color: var(--text-muted); margin-top: 15px; }
+.movie-card:hover img {
+    box-shadow: 0 12px 30px rgba(229, 9, 20, 0.4);
+}
 
-.social-links { margin-top: 15px; }
-.social-links a { color: var(--text-main); font-size: 20px; margin: 0 8px; text-decoration: none; transition: color 0.3s; }
-.social-links a:hover { color: var(--accent); }
+.movie-card-info { padding: 15px 5px; }
+.movie-card-info h3 { 
+    margin: 0 0 5px 0; 
+    font-size: 16px; 
+    font-weight: 600; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+}
+.movie-card-info p { margin: 0; color: var(--text-muted); font-size: 14px; }
+
+/* --- DETAIL VIEW HERO --- */
+.back-btn { 
+    background: rgba(255,255,255,0.1); 
+    padding: 10px 20px;
+    border-radius: 20px;
+    border: none; 
+    color: white; 
+    margin-bottom: 40px; 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 8px; 
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.back-btn:hover { background: var(--accent); }
+
+.hero-section { display: flex; gap: 60px; margin-bottom: 50px; align-items: flex-start; }
+#movie-poster { width: 350px; border-radius: 16px; box-shadow: 0 15px 40px rgba(0,0,0,0.8); }
+
+.movie-info h1 { font-size: 54px; margin: 0 0 20px 0; font-weight: 800; line-height: 1.1; letter-spacing: -1px; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 30px; }
+.tags span { 
+    background-color: rgba(255,255,255,0.08); 
+    padding: 8px 18px; 
+    border-radius: 20px; 
+    font-size: 14px; 
+    font-weight: 600; 
+    border: 1px solid rgba(255,255,255,0.1); 
+}
+
+.release-info { 
+    background-color: rgba(255,255,255,0.03); 
+    padding: 25px; 
+    border-radius: 16px; 
+    border-left: 5px solid var(--accent); 
+    margin-bottom: 35px; 
+}
+.release-info p { margin: 10px 0; font-size: 16px; }
+
+.storyline { line-height: 1.8; color: #d1d5db; font-size: 18px; max-width: 850px; }
+
+hr { border: none; height: 1px; background: rgba(255,255,255,0.1); margin: 60px 0; }
+
+/* --- PEOPLE CARDS --- */
+.people-section h2 { margin-bottom: 30px; font-size: 24px; }
+
+.person-card { 
+    background-color: var(--card-bg); 
+    border-radius: 16px; 
+    padding: 30px 20px; 
+    text-align: center; 
+    transition: background-color 0.3s; 
+}
+.person-card:hover { background-color: #2a3644; }
+
+.person-card img { 
+    width: 130px; 
+    height: 130px; 
+    border-radius: 50%; 
+    object-fit: cover; 
+    margin-bottom: 20px; 
+    border: 3px solid rgba(255,255,255,0.05); 
+}
+
+.person-card h3 { margin: 0 0 5px 0; font-size: 18px; font-weight: 700; }
+.role { color: var(--accent); font-size: 14px; font-weight: 600; margin-bottom: 15px; display: block; }
+.known-for { font-size: 13px; color: var(--text-muted); margin-top: 20px; line-height: 1.6; }
+.known-for strong { color: var(--text-main); }
+
+.social-links { display: flex; justify-content: center; gap: 10px; margin-top: 15px; }
+.social-links a { 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    width: 40px; 
+    height: 40px; 
+    border-radius: 50%; 
+    background: rgba(255,255,255,0.05); 
+    color: white; 
+    font-size: 18px; 
+    text-decoration: none; 
+    transition: all 0.3s; 
+}
+.social-links a:hover { background: var(--accent); transform: translateY(-3px); }
