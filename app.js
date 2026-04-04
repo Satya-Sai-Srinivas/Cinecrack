@@ -370,8 +370,9 @@ function renderMovieDetails(movie) {
             ? person.well_known_for.map(work => `${work.title} (${work.release_year || 'N/A'})`).join(', ')
             : 'N/A';
 
+        // NEW: Added style="cursor:pointer;" and onclick routing to the new page
         return `
-        <div class="person-card">
+        <div class="person-card" style="cursor: pointer;" onclick="window.location.href='person.html?id=${person.id}'">
             <img src="${person.image_url || 'https://via.placeholder.com/150x225?text=No+Image'}" alt="${person.name}">
             <div class="person-info">
                 <h4>${person.name}</h4>
@@ -387,8 +388,9 @@ function renderMovieDetails(movie) {
             ? person.well_known_for.map(work => `${work.title} (${work.release_year || 'N/A'})`).join(', ')
             : 'N/A';
 
+        // NEW: Added style="cursor:pointer;" and onclick routing to the new page
         return `
-        <div class="person-card">
+        <div class="person-card" style="cursor: pointer;" onclick="window.location.href='person.html?id=${person.id}'">
             <img src="${person.image_url || 'https://via.placeholder.com/150x225?text=No+Image'}" alt="${person.name}">
             <div class="person-info">
                 <h4>${person.name}</h4>
@@ -401,6 +403,7 @@ function renderMovieDetails(movie) {
 }
 
 // --- App Initialization (Updated) ---
+// --- App Initialization (Updated for Auto-Routing) ---
 window.onload = async () => {
     showLoading();
     
@@ -417,7 +420,22 @@ window.onload = async () => {
     }
     
     updateSectionTitle();
+    
+    // Load the background grid and history so it's ready if they click "Back"
     await loadNowPlaying();
     await loadHistory();
+
+    // --- NEW: Check if we arrived from a person's profile ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const movieIdFromUrl = urlParams.get('movie_id');
+
+    if (movieIdFromUrl) {
+        // Automatically fetch and display the movie details
+        await fetchAndShowMovie(movieIdFromUrl);
+        
+        // Clean up the URL so refreshing the page doesn't keep opening this movie
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     hideLoading();
 };

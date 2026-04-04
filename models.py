@@ -9,6 +9,7 @@ class SocialMediaLinks(BaseModel):
     twitter: Optional[HttpUrl] = Field(None, description="X/Twitter profile URL")
     facebook: Optional[HttpUrl] = Field(None, description="Facebook profile URL")
     imdb: Optional[HttpUrl] = Field(None, description="IMDb profile URL")
+    wikipedia: Optional[HttpUrl] = Field(None, description="Wikipedia URL") # NEW
 
 class WorkReference(BaseModel):
     title: str = Field(..., description="Title of the movie/show they are known for")
@@ -18,6 +19,7 @@ class WorkReference(BaseModel):
 # --- People (Cast & Crew) ---
 
 class Person(BaseModel):
+    id: int # NEW: Required for routing to the person.html page
     name: str
     image_url: Optional[HttpUrl] = None
     social_handles: SocialMediaLinks
@@ -60,8 +62,27 @@ class MovieDetailResponse(BaseModel):
     poster_url: Optional[HttpUrl] = None
     trailer_url: Optional[HttpUrl] = None
     
-    # Nested Relationships
     release_details: ReleaseInfo
     ratings_and_reviews: List[Review] = Field(default_factory=list)
     lead_cast: List[CastMember] = Field(default_factory=list)
     technicians: List[Technician] = Field(default_factory=list)
+
+# --- NEW: Person Profile Models ---
+
+class MovieCredit(BaseModel):
+    id: int
+    title: str
+    poster_url: Optional[HttpUrl] = None
+    release_date: Optional[date] = None
+    role: str = Field(..., description="Character name or Job title")
+
+class PersonDetailResponse(BaseModel):
+    id: int
+    name: str
+    biography: str
+    birthday: Optional[date] = None
+    place_of_birth: Optional[str] = None
+    profile_url: Optional[HttpUrl] = None
+    known_for_department: str
+    social_handles: SocialMediaLinks
+    credits: List[MovieCredit] = Field(default_factory=list)

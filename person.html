@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - CineCrack</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p>Loading profile...</p>
+    </div>
+
+    <header>
+        <div class="logo" onclick="window.location.href='index.html'" style="cursor: pointer;">🎬 CineCrack</div>
+    </header>
+
+    <main>
+        <button class="back-btn" onclick="window.history.back()"><i class="fas fa-arrow-left"></i> Back</button>
+
+        <section class="person-hero" id="person-hero" style="display: none;">
+            <img id="person-image" class="person-hero-img" src="" alt="Profile Picture">
+            <div class="person-hero-info">
+                <h1 id="person-name">Loading...</h1>
+                <div class="person-meta">
+                    <span id="person-department"><i class="fas fa-camera"></i> </span>
+                    <span id="person-birthday"><i class="fas fa-birthday-cake"></i> </span>
+                    <span id="person-birthplace"><i class="fas fa-map-marker-alt"></i> </span>
+                </div>
+                
+                <div class="person-socials" id="person-socials" style="margin-bottom: 25px;">
+                    </div>
+
+                <h3>Biography</h3>
+                <p id="person-bio" class="person-bio"></p>
+            </div>
+        </section>
+
+        <h2 class="section-title">Filmography</h2>
+        <div class="grid-container" id="filmography-grid">
+            </div>
+    </main>
+
+    <script src="person.js"></script>
+</body>
+</html>

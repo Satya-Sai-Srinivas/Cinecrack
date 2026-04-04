@@ -295,3 +295,76 @@ hr { border: none; height: 1px; background: rgba(255,255,255,0.1); margin: 60px 
     border-color: white;
     font-weight: 600;
 }
+
+/* --- PERSON PROFILE PAGE --- */
+.person-hero {
+    display: flex;
+    gap: 50px;
+    background-color: var(--card-bg);
+    padding: 40px;
+    border-radius: 20px;
+    margin-bottom: 50px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.person-hero-img {
+    width: 300px;
+    height: 450px;
+    object-fit: cover;
+    border-radius: 16px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.6);
+}
+
+.person-hero-info h1 {
+    font-size: 48px;
+    margin: 0 0 10px 0;
+    font-weight: 800;
+}
+
+.person-meta {
+    color: var(--text-muted);
+    font-size: 16px;
+    margin-bottom: 25px;
+    display: flex;
+    gap: 20px;
+}
+
+.person-bio {
+    font-size: 17px;
+    line-height: 1.8;
+    color: #d1d5db;
+    margin-bottom: 30px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding-right: 15px;
+}
+
+/* Custom Scrollbar for Bio */
+.person-bio::-webkit-scrollbar { width: 6px; }
+.person-bio::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 10px; }
+.person-bio::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
+
+.person-socials {
+    display: flex;
+    gap: 15px;
+}
+
+.person-socials a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    color: white;
+    font-size: 20px;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.person-socials a:hover {
+    background: var(--accent);
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(229, 9, 20, 0.4);
+}
