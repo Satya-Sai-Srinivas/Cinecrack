@@ -699,6 +699,3 @@ async def get_search_history(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(SearchHistory).order_by(SearchHistory.searched_at.desc()).limit(10))
     history = result.scalars().all()
     return history
-
-# --- 5. Mount Frontend ---
-app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
