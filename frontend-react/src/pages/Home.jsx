@@ -5,7 +5,7 @@ import { fetchNowPlaying, fetchSearchMovies } from '../api'
 import { useRegionStore } from '../store/useAppStore'
 import { useLocationDetect } from '../hooks/useLocation'
 import { useIntersectionObserver } from '../hooks/useInfiniteScroll'
-import { MovieCard } from '../components/movie/MovieCard'
+import MovieCard from '../components/movie/MovieCard'
 import { SkeletonGrid } from '../components/ui/SkeletonCard'
 import { EmptyState } from '../components/ui/EmptyState'
 
@@ -107,7 +107,6 @@ export default function Home() {
     [detectedRegion, detectedCity, setRegion, isSearchMode, handleClearSearch]
   )
 
-  // Determine active market button
   const activeMarket =
     currentCity && currentCity === detectedCity
       ? 'LOCAL'
@@ -123,120 +122,130 @@ export default function Home() {
   })
 
   return (
-    <div className="p-6 md:p-8 max-w-screen-xl">
-      {/* Search bar */}
-      <div className="flex gap-3 mb-6">
-        <div className="relative flex-1 max-w-xl">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Search movies…"
-            className="w-full pl-9 pr-9 py-2.5 text-sm rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors"
-          />
-          {searchInput && (
-            <button onClick={handleClearSearch} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-main)]">
-              <X size={14} />
-            </button>
-          )}
-        </div>
-        <button
-          onClick={handleSearch}
-          className="px-4 py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
-        >
-          Search
-        </button>
-      </div>
-
-      {/* Market + language filters (only in now-playing mode) */}
-      {!isSearchMode && (
-        <div className="flex flex-col gap-3 mb-6">
-          <div className="flex items-center gap-2 flex-wrap">
-            {detectedCity && (
-              <MarketBtn
-                label={<><MapPin size={12} className="inline mr-1" />{detectedCity}</>}
-                active={activeMarket === 'LOCAL'}
-                onClick={() => handleMarket('LOCAL')}
-              />
+    <main className="flex-1 h-screen overflow-y-auto bg-[var(--bg-color)] transition-colors duration-300">
+      <div className="w-full max-w-[1600px] p-6 md:p-10">
+        
+        {/* Search bar Area */}
+        <section className="flex flex-col md:flex-row gap-4 mb-10 w-full max-w-4xl">
+        <div className="relative flex-1 group">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-[var(--accent)] transition-colors" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Search movies, actors, or genres..."
+              className="w-full pl-12 pr-12 py-3.5 text-sm rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] text-[var(--text-main)] shadow-sm focus:ring-4 focus:ring-[var(--accent)]/10 focus:border-[var(--accent)] transition-all outline-none"
+            />
+            {searchInput && (
+              <button onClick={handleClearSearch} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-red-500 transition-colors">
+                <X size={18} />
+              </button>
             )}
-            <MarketBtn label="🇺🇸 US" active={activeMarket === 'US'} onClick={() => handleMarket('US')} />
-            <MarketBtn label="🇮🇳 IN" active={activeMarket === 'IN'} onClick={() => handleMarket('IN')} />
           </div>
-
-          {currentRegion === 'IN' && (
-            <div className="flex items-center gap-2 flex-wrap">
-              {LANG_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setLang(opt.value)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                    currentLang === opt.value
-                      ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                      : 'border-[var(--border-color)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Section title */}
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-[var(--text-main)]">{sectionTitle}</h1>
-        {isSearchMode && (
           <button
-            onClick={handleClearSearch}
-            className="text-sm text-[var(--text-muted)] hover:text-[var(--accent)] flex items-center gap-1"
+            onClick={handleSearch}
+            className="px-8 py-3.5 rounded-2xl bg-[var(--accent)] text-white font-bold shadow-lg shadow-[var(--accent)]/20 hover:bg-[var(--accent-hover)] hover:-translate-y-0.5 active:translate-y-0 transition-all"
           >
-            <X size={14} /> Clear search
+            Search
           </button>
-        )}
-      </div>
+        </section>
 
-      {/* Grid */}
-      {isLoading ? (
-        <SkeletonGrid />
-      ) : isError ? (
-        <EmptyState
-          title="Something went wrong"
-          subtitle="Could not load movies. Please check your connection."
-          action={
-            <button
-              onClick={() => activeQuery.refetch()}
-              className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm hover:bg-[var(--accent-hover)]"
-            >
-              Retry
-            </button>
-          }
-        />
-      ) : movies.length === 0 ? (
-        <EmptyState
-          title={isSearchMode ? `No results for "${searchQuery}"` : 'No movies available'}
-          subtitle={isSearchMode ? 'Try different keywords or check the spelling.' : 'Check back later.'}
-        />
-      ) : (
-        <>
-          <div className="movie-grid">
-            {movies.map((movie) => (
-              <MovieCard key={movie.id} movie={movie} sourceRef="home" />
-            ))}
-          </div>
-
-          {/* Sentinel + bottom loading indicator */}
-          <div ref={sentinelRef} className="h-4 mt-4" />
-          {isFetchingNext && (
-            <div className="flex justify-center py-6">
-              <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+        {/* Filters & Markets */}
+        {!isSearchMode && (
+          <div className="flex flex-col gap-4 mb-10">
+            <div className="flex items-center gap-3 flex-wrap">
+              {detectedCity && (
+                <MarketBtn
+                  label={<><MapPin size={14} className="inline mr-1.5" />{detectedCity}</>}
+                  active={activeMarket === 'LOCAL'}
+                  onClick={() => handleMarket('LOCAL')}
+                />
+              )}
+              <MarketBtn label="🇺🇸 United States" active={activeMarket === 'US'} onClick={() => handleMarket('US')} />
+              <MarketBtn label="🇮🇳 India" active={activeMarket === 'IN'} onClick={() => handleMarket('IN')} />
             </div>
+
+            {currentRegion === 'IN' && (
+              <div className="flex items-center gap-2 flex-wrap animate-in fade-in slide-in-from-left-4 duration-500">
+                {LANG_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setLang(opt.value)}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all ${
+                      currentLang === opt.value
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md'
+                        : 'bg-[var(--surface)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Dynamic Title Bar */}
+        <header className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-black text-[var(--text-main)] tracking-tight">{sectionTitle}</h1>
+            <div className="h-1 w-12 bg-[var(--accent)] rounded-full mt-2" />
+          </div>
+          {isSearchMode && (
+            <button
+              onClick={handleClearSearch}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text-main)] transition-all flex items-center gap-2"
+            >
+              <X size={16} /> Exit Search
+            </button>
           )}
-        </>
-      )}
-    </div>
+        </header>
+
+        {/* Results Grid */}
+        <section className="min-h-[400px]">
+          {isLoading ? (
+            <SkeletonGrid />
+          ) : isError ? (
+            <EmptyState
+              title="Connection Lost"
+              subtitle="We couldn't reach the cinematic archives. Check your internet."
+              action={
+                <button
+                  onClick={() => activeQuery.refetch()}
+                  className="px-6 py-2.5 rounded-xl bg-[var(--accent)] text-white font-bold hover:bg-[var(--accent-hover)] transition-all"
+                >
+                  Retry Connection
+                </button>
+              }
+            />
+          ) : movies.length === 0 ? (
+            <EmptyState
+              title={isSearchMode ? `No matches for "${searchQuery}"` : 'The marquee is empty'}
+              subtitle={isSearchMode ? 'Try a different title, actor, or vibe.' : 'Check back shortly for new releases.'}
+            />
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-6 animate-in fade-in duration-700 w-full">
+  {movies.map(movie => (
+    <MovieCard key={movie.id} movie={movie} />
+  ))}
+</div>
+
+              {/* Infinite Scroll Sentinel */}
+              <div ref={sentinelRef} className="h-20 flex items-center justify-center">
+                {isFetchingNext && (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-8 h-8 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">Loading more</span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+    </main>
   )
 }
 
@@ -244,10 +253,10 @@ function MarketBtn({ label, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+      className={`px-5 py-2.5 text-xs font-bold rounded-xl border transition-all ${
         active
-          ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-          : 'border-[var(--border-color)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+          ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20 scale-105'
+          : 'bg-[var(--surface)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] hover:scale-105'
       }`}
     >
       {label}

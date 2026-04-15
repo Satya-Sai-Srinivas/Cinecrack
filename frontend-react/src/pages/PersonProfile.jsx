@@ -2,7 +2,6 @@ import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Camera, Cake, MapPin, ExternalLink } from 'lucide-react'
 import { fetchPerson } from '../api'
-import { MovieCard } from '../components/movie/MovieCard'
 import { SkeletonGrid } from '../components/ui/SkeletonCard'
 import { EmptyState } from '../components/ui/EmptyState'
 

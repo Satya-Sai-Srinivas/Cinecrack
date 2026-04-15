@@ -44,7 +44,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route index element={<Home />} />
               <Route path="discover" element={<Discover />} />
-              <Route path="hub" element={<CinemaHub />} />
+              <Route path="regional-hub" element={<CinemaHub />} />
               <Route path="movie/:id" element={<MovieDetail />} />
               <Route path="person/:id" element={<PersonProfile />} />
               <Route path="history" element={<History />} />

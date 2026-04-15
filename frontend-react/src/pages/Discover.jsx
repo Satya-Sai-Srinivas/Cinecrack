@@ -4,7 +4,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { SlidersHorizontal } from 'lucide-react'
 import { fetchDiscover } from '../api'
 import { useIntersectionObserver } from '../hooks/useInfiniteScroll'
-import { MovieCard } from '../components/movie/MovieCard'
+import MovieCard from '../components/movie/MovieCard'
 import { SkeletonGrid } from '../components/ui/SkeletonCard'
 import { EmptyState } from '../components/ui/EmptyState'
 

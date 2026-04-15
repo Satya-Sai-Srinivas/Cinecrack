@@ -1,96 +1,37 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Move these outside of the @layer block */
 :root {
-  --bg-color: #f0f9ff;
+  /* LIGHT MODE */
+  --bg-color: #f0f9ff; /* <--- This needs to be the light blue */
   --sidebar-bg: #e0f2fe;
-  --card-bg: #ffffff;
   --surface: #ffffff;
-  --overlay-bg: rgba(255, 255, 255, 0.85);
   --text-main: #0f172a;
   --text-muted: #64748b;
-  --text-inverse: #ffffff;
   --accent: #0284c7;
   --accent-hover: #0369a1;
   --border-color: #bae6fd;
 }
 
-html.dark {
-  --bg-color: #020617;
+.dark {
+  /* DARK MODE */
+  --bg-color: #020617; /* <--- This needs to be the dark navy */
   --sidebar-bg: #0f172a;
-  --card-bg: #111827;
   --surface: #1e293b;
-  --overlay-bg: rgba(2, 6, 23, 0.78);
   --text-main: #e2e8f0;
   --text-muted: #94a3b8;
-  --text-inverse: #ffffff;
   --accent: #38bdf8;
   --accent-hover: #0ea5e9;
   --border-color: #334155;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  font-family: 'Inter', sans-serif;
-  background-color: var(--bg-color);
-  color: var(--text-main);
-  -webkit-font-smoothing: antialiased;
-  transition: background-color 0.2s, color 0.2s;
-}
-
-#root {
-  display: flex;
-  min-height: 100vh;
-}
-
-/* Scrollbar styling */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-
-/* Movie grid */
-.movie-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 24px;
-}
-
-/* Skeleton shimmer animation */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.skeleton {
-  background: linear-gradient(90deg, var(--surface) 25%, var(--border-color) 50%, var(--surface) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: 12px;
-}
-
-/* Prose styling for chatbot markdown */
-.prose-chat p { margin-bottom: 0.5rem; }
-.prose-chat ul { padding-left: 1.25rem; list-style: disc; }
-.prose-chat ol { padding-left: 1.25rem; list-style: decimal; }
-.prose-chat li { margin-bottom: 0.25rem; }
-.prose-chat strong { font-weight: 600; }
-.prose-chat em { font-style: italic; }
-
-/* Hide scrollbar but keep scroll functionality */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-/* Snap scroll for cinema hub rows */
-.snap-row {
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-}
-.snap-row > * {
-  scroll-snap-align: start;
+/* Keep only the @apply rules in the layer block */
+@layer base {
+  body {
+    @apply bg-[var(--bg-color)] text-[var(--text-main)] font-sans antialiased transition-colors duration-300;
+  }
 }
