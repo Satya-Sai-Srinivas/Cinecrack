@@ -1,14 +1,17 @@
-const BASE = '/api/v1'
+const API_DOMAIN = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+const BASE = '/api/v1';
 
 async function get(path, params = {}) {
-  const url = new URL(path, window.location.origin)
-  url.pathname = path
+  // Combine the Google Cloud domain with the specific endpoint path
+  const url = new URL(`${BASE}${path}`, API_DOMAIN);
+  
   Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v)
-  })
-  const res = await fetch(url.toString())
-  if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`)
-  return res.json()
+    if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
+  });
+
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
+  return res.json();
 }
 
 // ---------- Movies ----------
@@ -53,15 +56,17 @@ export const fetchLocation = async () => {
 
 // ---------- AI Chat (SSE) ----------
 // Returns a ReadableStream from the fetch — the caller handles parsing.
+// ---------- AI Chat (SSE) ----------
 export async function streamChat(query, conversationHistory) {
-  const res = await fetch(`${BASE}/ai/chat`, {
+  // Update this fetch line to use API_DOMAIN
+  const res = await fetch(`${API_DOMAIN}${BASE}/ai/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       query,
       conversation_history: conversationHistory,
     }),
-  })
-  if (!res.ok) throw new Error(`Chat API error ${res.status}`)
-  return res.body // ReadableStream
+  });
+  if (!res.ok) throw new Error(`Chat API error ${res.status}`);
+  return res.body; 
 }
