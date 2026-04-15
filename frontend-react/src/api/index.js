@@ -2,8 +2,8 @@ const API_DOMAIN = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 const BASE = '/api/v1';
 
 async function get(path, params = {}) {
-  // Combine the Google Cloud domain with the specific endpoint path
-  const url = new URL(`${BASE}${path}`, API_DOMAIN);
+  // FIX: Removed the extra ${BASE} here because your functions below already include it!
+  const url = new URL(path, API_DOMAIN);
   
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
@@ -55,10 +55,7 @@ export const fetchLocation = async () => {
 }
 
 // ---------- AI Chat (SSE) ----------
-// Returns a ReadableStream from the fetch — the caller handles parsing.
-// ---------- AI Chat (SSE) ----------
 export async function streamChat(query, conversationHistory) {
-  // Update this fetch line to use API_DOMAIN
   const res = await fetch(`${API_DOMAIN}${BASE}/ai/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
