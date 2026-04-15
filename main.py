@@ -50,10 +50,7 @@ app = FastAPI(title="CineCrack API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",             # For local testing
-        "https://cinecrack.vercel.app"       # Replace this with your EXACT Vercel URL
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
