@@ -13,6 +13,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, HttpUrl, Field
 from datetime import datetime, timedelta
+from auth import get_current_user
+from database import Watchlist, User, ChatThread # Add the new tables
+from models import WatchlistRequest, WatchlistResponse # Add the new models
+from fastapi import Request
+import httpx
 
 # --- Database Imports ---
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -290,6 +295,39 @@ def _sse_event(payload: Dict[str, Any]) -> str:
     return f"data: {json.dumps(payload)}\n\n"
 
 # --- 4. API Endpoints ---
+@app.get("/api/v1/geo/location")
+async def get_user_location(request: Request):
+    # 1. Get the User's Real IP
+    # We check X-Forwarded-For first, then fall back to client.host
+    x_forwarded_for = request.headers.get("X-Forwarded-For")
+    
+    if x_forwarded_for:
+        # The first IP in the list is the actual user
+        user_ip = x_forwarded_for.split(",")[0].strip()
+    else:
+        user_ip = request.client.host
+
+    # 2. Handle Localhost (ipapi.co won't recognize 127.0.0.1)
+    if user_ip in ["127.0.0.1", "localhost", "::1"]:
+        # When testing locally, you can hardcode your current public IP 
+        # or just return a default so the app doesn't break.
+        return {"country_code": "US", "city": "Boston", "region": "MA", "is_local": True}
+
+    # 3. Call the external API using the SPECIFIC User IP
+    try:
+        async with httpx.AsyncClient() as client:
+            # We append the user_ip to the URL so ipapi.co knows who we are asking about
+            geo_url = f"https://ipapi.co/{user_ip}/json/"
+            response = await client.get(geo_url, timeout=5.0)
+            
+            if response.status_code == 200:
+                return response.json()
+            return {"country_code": "US", "error": "API Error"}
+    except Exception as e:
+        print(f"Geo Error: {e}")
+        return {"country_code": "US", "error": str(e)}
+
+
 @app.get("/api/v1/movies/now-playing", response_model=List[MoviePreview])
 async def get_now_playing(region: str = "US", lang: str = "all", page: int = 1):
     if lang != "all":
@@ -434,6 +472,18 @@ async def ai_chat(payload: AIChatRequest, db: AsyncSession = Depends(get_db)):
     if payload.conversation_history:
         history_payload = [turn.model_dump() for turn in payload.conversation_history]
 
+    history_result = await db.execute(
+        select(SearchHistory).order_by(SearchHistory.searched_at.desc()).limit(15)
+    )
+    recent_history_records = history_result.scalars().all()
+    
+    if recent_history_records:
+        # Extract unique titles while preserving the chronological order
+        history_titles = list(dict.fromkeys([h.movie_title for h in recent_history_records]))
+        user_history_str = ", ".join(history_titles)
+    else:
+        user_history_str = "The user has not watched or searched for any movies yet."
+
     async def event_generator():
         try:
             if not retrieved_movies:
@@ -447,6 +497,7 @@ async def ai_chat(payload: AIChatRequest, db: AsyncSession = Depends(get_db)):
                     query=payload.query,
                     conversation_history=history_payload,
                     retrieved_movies=retrieved_movies,
+                    user_history=user_history_str
                 ):
                     yield _sse_event(stream_chunk)
 
@@ -694,8 +745,41 @@ async def get_person_details(person_id: int):
             credits=credits_list
         )
 
+@app.post("/api/v1/user/watchlist")
+async def add_to_watchlist(
+    payload: WatchlistRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    # Check if the movie is already in this user's list
+    result = await db.execute(
+        select(Watchlist).where(Watchlist.user_id == user_id, Watchlist.movie_id == payload.movie_id)
+    )
+    existing_entry = result.scalars().first()
+    
+    if existing_entry:
+        existing_entry.status = payload.status
+    else:
+        new_entry = Watchlist(user_id=user_id, movie_id=payload.movie_id, status=payload.status)
+        db.add(new_entry)
+        
+    await db.commit()
+    return {"message": "Watchlist updated successfully"}
+
+@app.get("/api/v1/user/watchlist", response_model=List[WatchlistResponse])
+async def get_watchlist(
+    db: AsyncSession = Depends(get_db), 
+    user_id: str = Depends(get_current_user)
+):
+    result = await db.execute(select(Watchlist).where(Watchlist.user_id == user_id))
+    items = result.scalars().all()
+    return items
+
 @app.get("/api/v1/history")
-async def get_search_history(db: AsyncSession = Depends(get_db)):
+async def get_search_history(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user) # <--- This secures the endpoint!
+):
     result = await db.execute(select(SearchHistory).order_by(SearchHistory.searched_at.desc()).limit(10))
     history = result.scalars().all()
     return history

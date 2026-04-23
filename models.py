@@ -87,3 +87,13 @@ class PersonDetailResponse(BaseModel):
     known_for_department: str
     social_handles: SocialMediaLinks
     credits: List[MovieCredit] = Field(default_factory=list)
+
+class WatchlistRequest(BaseModel):
+    movie_id: int
+    status: str = Field(default="WATCHLIST", description="Must be 'WATCHLIST' or 'WATCHED'")
+
+class WatchlistResponse(BaseModel):
+    id: int
+    user_id: str
+    movie_id: int
+    status: str

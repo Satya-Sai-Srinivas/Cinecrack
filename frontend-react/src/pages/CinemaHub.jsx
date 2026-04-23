@@ -1,9 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Globe, ChevronRight } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { fetchRegionalHub } from '../api'
-
-const PLACEHOLDER = 'https://placehold.co/300x450/1e293b/94a3b8?text=No+Image'
+import MovieCard from '../components/movie/MovieCard'
 
 const SECTIONS = [
   { key: 'tollywood',    label: '🎬 Tollywood', subtitle: 'Telugu Cinema' },
@@ -13,37 +11,14 @@ const SECTIONS = [
   { key: 'international', label: '🌍 International', subtitle: 'World Cinema' },
 ]
 
-function HubMovieCard({ movie }) {
-  return (
-    <Link
-      to={`/movie/${movie.id}`}
-      state={{ from: '/hub' }}
-      className="group flex-shrink-0 w-36"
-    >
-      <div className="overflow-hidden rounded-xl aspect-[2/3] bg-[var(--surface)] border border-[var(--border-color)] shadow-sm transition-transform duration-200 group-hover:-translate-y-1 group-hover:shadow-md">
-        <img
-          src={movie.poster_url || PLACEHOLDER}
-          alt={movie.title}
-          className="w-full h-full object-cover"
-          loading="lazy"
-          onError={(e) => { e.target.src = PLACEHOLDER }}
-        />
-      </div>
-      <p className="text-xs font-semibold text-[var(--text-main)] mt-2 line-clamp-2 group-hover:text-[var(--accent)] transition-colors">
-        {movie.title}
-      </p>
-      <p className="text-[11px] text-[var(--text-muted)]">{movie.release_date?.slice(0, 4) ?? ''}</p>
-    </Link>
-  )
-}
-
 function SkeletonRow() {
   return (
-    <div className="flex gap-4 overflow-hidden">
+    <div className="flex gap-4 overflow-hidden w-full">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="flex-shrink-0 w-36 flex flex-col gap-2">
+        <div key={i} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] flex flex-col gap-2">
           <div className="skeleton aspect-[2/3] w-full rounded-xl" />
-          <div className="skeleton h-3 w-3/4 rounded" />
+          <div className="skeleton h-4 w-3/4 rounded mt-2" />
+          <div className="skeleton h-3 w-1/2 rounded" />
         </div>
       ))}
     </div>
@@ -52,13 +27,13 @@ function SkeletonRow() {
 
 function CinemaRow({ label, subtitle, movies, isLoading, isError }) {
   return (
-    <section className="mb-10">
-      <div className="flex items-center gap-3 mb-4">
+    <section className="mb-10 w-full">
+      <div className="flex items-center gap-3 mb-4 group cursor-pointer">
         <div>
-          <h2 className="text-lg font-bold text-[var(--text-main)]">{label}</h2>
-          <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>
+          <h2 className="text-xl font-bold text-[var(--text-main)] tracking-tight">{label}</h2>
+          <p className="text-sm font-medium text-[var(--text-muted)] mt-0.5">{subtitle}</p>
         </div>
-        <ChevronRight size={16} className="text-[var(--text-muted)] ml-auto" />
+        <ChevronRight size={20} className="text-[var(--text-muted)] ml-auto opacity-50 transition-transform group-hover:translate-x-1 group-hover:opacity-100 group-hover:text-[var(--accent)]" />
       </div>
 
       {isLoading ? (
@@ -68,9 +43,12 @@ function CinemaRow({ label, subtitle, movies, isLoading, isError }) {
       ) : !movies?.length ? (
         <p className="text-sm text-[var(--text-muted)] pl-1">No movies available right now.</p>
       ) : (
-        <div className="snap-row flex gap-4 pb-2">
+        /* The momentum-scroll wrapper for Native-App swiping */
+        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-6 momentum-scroll w-full">
           {movies.map((m) => (
-            <HubMovieCard key={m.id} movie={m} />
+            <div key={m.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] snap-item">
+              <MovieCard movie={m} />
+            </div>
           ))}
         </div>
       )}
@@ -86,12 +64,17 @@ export default function CinemaHub() {
   })
 
   return (
-    <div className="p-6 md:p-8 max-w-screen-xl">
-      <div className="flex items-center gap-2 mb-8">
-        <Globe size={20} className="text-[var(--accent)]" />
-        <h1 className="text-xl font-bold text-[var(--text-main)]">Cinema Hub</h1>
-        <span className="text-xs text-[var(--text-muted)] ml-1">— Now Playing Globally</span>
-      </div>
+    <div className="p-6 md:p-8 max-w-screen-xl mx-auto w-full">
+      {/* Upgraded Header */}
+      <header className="flex items-center gap-3 mb-10 border-b border-[var(--border-color)]/50 pb-6">
+        <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
+          <Globe size={22} className="text-[var(--accent)]" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-black text-[var(--text-main)] tracking-tight">Cinema Hub</h1>
+          <p className="text-sm font-medium text-[var(--text-muted)] mt-1">Now Playing Globally</p>
+        </div>
+      </header>
 
       {SECTIONS.map(({ key, label, subtitle }) => (
         <CinemaRow

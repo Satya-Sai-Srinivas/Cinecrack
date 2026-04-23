@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { Film, Compass, Globe, Clock, Moon, Sun } from 'lucide-react';
 import { useThemeStore } from '../../store/useAppStore'; 
+import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react"
 
 export default function Sidebar() {
   const theme = useThemeStore((s) => s.theme)
@@ -15,13 +16,26 @@ export default function Sidebar() {
 
   return (
     <aside className="w-64 flex-shrink-0 flex flex-col bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] transition-colors duration-300 hidden md:flex h-screen sticky top-0 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-      {/* Brand Logo */}
+      
+      {/* Brand Logo & Clerk Auth */}
       <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center shadow-lg shadow-[var(--accent)]/40 text-white font-black text-xl">
-          C
-        </div>
+        {/* If user is logged in, show their profile picture */}
+        <SignedIn>
+          <UserButton afterSignOutUrl="/" />
+        </SignedIn>
+
+        {/* If user is logged out, show the Sign In button */}
+        <SignedOut>
+          <SignInButton mode="modal">
+            <button className="px-3 py-1.5 text-xs font-bold rounded-lg bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors shadow-md shrink-0">
+              Sign In
+            </button>
+          </SignInButton>
+        </SignedOut>
+
+        {/* Updated Rebrand to Cinerack */}
         <h1 className="text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[var(--text-main)] to-[var(--accent)]">
-          Cinecrack
+          Cinerack
         </h1>
       </div>
 

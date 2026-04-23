@@ -29,14 +29,41 @@ class MovieCache(Base):
     movie_data = Column(JSONB, nullable=False) 
     cached_at = Column(DateTime, default=datetime.utcnow)
 
+# Update your SearchHistory to include user_id
 class SearchHistory(Base):
     __tablename__ = "search_history"
     
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=True) # NEW: Links to Clerk user
     movie_id = Column(Integer, nullable=False)
     movie_title = Column(String, nullable=False)
     searched_at = Column(DateTime, default=datetime.utcnow)
 
+# --- NEW TABLES FOR PHASE 2 ---
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(String, primary_key=True, index=True) # This will store the Clerk User ID
+    email = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Watchlist(Base):
+    __tablename__ = "watchlist"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=False)
+    movie_id = Column(Integer, index=True, nullable=False)
+    status = Column(String, default="WATCHLIST") # Options: "WATCHLIST", "WATCHED"
+    added_at = Column(DateTime, default=datetime.utcnow)
+
+class ChatThread(Base):
+    __tablename__ = "chat_threads"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=False)
+    title = Column(String, default="New Conversation")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class MovieEmbedding(Base):
     __tablename__ = "movie_embeddings"

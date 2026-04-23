@@ -1,6 +1,44 @@
 import { Link } from 'react-router-dom';
+import { Bookmark } from 'lucide-react';
+import { useState } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 
 export default function MovieCard({ movie }) {
+  const { getToken, isSignedIn } = useAuth();
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async (e) => {
+    e.preventDefault(); // Prevents the Link from triggering!
+    e.stopPropagation();
+
+    if (!isSignedIn) {
+      alert("Please sign in to save movies!");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const token = await getToken();
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/user/watchlist`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ movie_id: movie.id, status: 'WATCHLIST' })
+      });
+
+      if (response.ok) {
+        setIsSaved(!isSaved);
+      }
+    } catch (error) {
+      console.error("Failed to save movie", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <Link 
       to={`/movie/${movie.id}`} 
@@ -23,6 +61,15 @@ export default function MovieCard({ movie }) {
         {/* Cinematic Vignette Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-[#020617]/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
       </div>
+
+      {/* NEW: Bookmark Button */}
+      <button 
+        onClick={handleSave}
+        disabled={isSaving}
+        className="absolute top-3 right-3 z-10 p-2 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/20 opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-[var(--accent)] hover:border-[var(--accent)] disabled:opacity-50"
+      >
+        <Bookmark size={18} fill={isSaved ? "currentColor" : "none"} className={isSaved ? "text-white" : ""} />
+      </button>
 
       {/* Title Reveal */}
       <div className="absolute bottom-0 left-0 w-full p-4 translate-y-6 opacity-0 transition-all duration-500 ease-out group-hover:translate-y-0 group-hover:opacity-100">
