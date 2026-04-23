@@ -1,15 +1,42 @@
 import { useQuery } from '@tanstack/react-query'
 import { History as HistoryIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { fetchHistory } from '../api'
 import { EmptyState } from '../components/ui/EmptyState'
+import { useAuth } from '@clerk/clerk-react'
 
 export default function History() {
+  // Grab the auth details from Clerk
+  const { getToken, isLoaded, isSignedIn } = useAuth()
+
+  // Securely fetch the history using the Clerk JWT
   const { data, isLoading, isError } = useQuery({
     queryKey: ['history'],
-    queryFn: fetchHistory,
+    queryFn: async () => {
+      const token = await getToken()
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/history`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (!response.ok) throw new Error('Network response was not ok')
+      return response.json()
+    },
+    enabled: isLoaded && isSignedIn, // Only fetch if Clerk is ready AND the user is logged in
     staleTime: 60 * 1000,
   })
+
+  // Show a clean message if they aren't logged in
+  if (isLoaded && !isSignedIn) {
+    return (
+      <div className="p-6 md:p-8 max-w-screen-xl">
+        <EmptyState 
+          title="Sign in required" 
+          subtitle="Please sign in using the sidebar to view your history." 
+        />
+      </div>
+    )
+  }
 
   // Deduplicate by movie_id (matches vanilla JS behaviour)
   const unique = []
@@ -44,7 +71,6 @@ export default function History() {
             <Link
               key={h.movie_id}
               to={`/movie/${h.movie_id}`}
-              state={{ from: '/history' }}
               className="px-4 py-2 rounded-full border border-[var(--border-color)] bg-[var(--surface)] text-sm text-[var(--text-main)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors font-medium"
             >
               {h.movie_title}
