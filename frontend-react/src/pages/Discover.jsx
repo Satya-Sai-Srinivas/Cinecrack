@@ -211,7 +211,7 @@ export default function Discover() {
       ) : (
         <>
           <p className="text-sm text-[var(--text-muted)] mb-4">{movies.length}+ result{movies.length !== 1 ? 's' : ''}</p>
-          <div className="movie-grid">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 w-full mt-6">
             {movies.map((movie) => (
               <MovieCard key={movie.id} movie={movie} sourceRef="discover" />
             ))}

@@ -11,6 +11,14 @@ const PLACEHOLDER_POSTER = 'https://placehold.co/300x450/1e293b/94a3b8?text=No+I
 
 const WELCOME = "Welcome. Describe a vibe, character arc, ending tone, or visual atmosphere, and I will curate cinematic matches."
 
+// Helper to format **bold** text from the AI markdown
+const formatText = (text) => {
+  if (!text) return null;
+  return text.split('**').map((part, index) => 
+    index % 2 === 1 ? <strong key={index} className="font-bold text-[var(--accent)]">{part}</strong> : part
+  );
+};
+
 // ---- Mini movie card used inside chatbot bubbles ----
 function CompactMovieCard({ movie }) {
   return (
@@ -64,7 +72,7 @@ function MessageBubble({ msg }) {
               <span className="text-xs font-medium text-[var(--text-muted)]">Curating cinema…</span>
             </div>
           ) : (
-            <p className="whitespace-pre-wrap">{msg.content || ''}</p>
+            <p className="whitespace-pre-wrap">{formatText(msg.content || '')}</p>
           )}
         </div>
 
@@ -202,10 +210,10 @@ export function ChatbotWidget() {
           ))}
         </div>
 
-        {/* Input form - Transparent to allow blur to show through */}
+        {/* Input form - Hardcoded backgrounds for text legibility */}
         <form
           onSubmit={handleSubmit}
-          className="flex items-end gap-2 px-4 py-4 border-t border-[var(--border-color)]/40 bg-transparent"
+          className="flex items-end gap-2 px-4 py-4 border-t border-[var(--border-color)]/40 bg-[var(--surface)]"
         >
           <textarea
             ref={textareaRef}
@@ -215,7 +223,7 @@ export function ChatbotWidget() {
             rows={1}
             placeholder="Ask for moods, themes, eras…"
             disabled={isStreaming}
-            className="flex-1 resize-none rounded-xl px-4 py-3 text-sm bg-[var(--surface)]/60 backdrop-blur-md border border-[var(--border-color)]/50 text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 transition-all overflow-hidden shadow-inner"
+            className="flex-1 resize-none rounded-xl px-4 py-3 text-sm bg-white dark:bg-[#1e293b] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all overflow-hidden shadow-inner"
             style={{ maxHeight: 120 }}
           />
           <button
