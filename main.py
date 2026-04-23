@@ -472,6 +472,18 @@ async def ai_chat(payload: AIChatRequest, db: AsyncSession = Depends(get_db)):
     if payload.conversation_history:
         history_payload = [turn.model_dump() for turn in payload.conversation_history]
 
+    history_result = await db.execute(
+        select(SearchHistory).order_by(SearchHistory.searched_at.desc()).limit(15)
+    )
+    recent_history_records = history_result.scalars().all()
+    
+    if recent_history_records:
+        # Extract unique titles while preserving the chronological order
+        history_titles = list(dict.fromkeys([h.movie_title for h in recent_history_records]))
+        user_history_str = ", ".join(history_titles)
+    else:
+        user_history_str = "The user has not watched or searched for any movies yet."
+
     async def event_generator():
         try:
             if not retrieved_movies:
@@ -485,6 +497,7 @@ async def ai_chat(payload: AIChatRequest, db: AsyncSession = Depends(get_db)):
                     query=payload.query,
                     conversation_history=history_payload,
                     retrieved_movies=retrieved_movies,
+                    user_history=user_history_str
                 ):
                     yield _sse_event(stream_chunk)
 

@@ -120,15 +120,34 @@ async def fetch_wikipedia_plot(
 
     return extract_plot_section(wikipedia_extract)
 
+async def fetch_movie_credits(client: httpx.AsyncClient, movie_id: int) -> str:
+    response = await client.get(
+        f"{BASE_URL}/movie/{movie_id}/credits",
+        headers=HEADERS,
+        params=AUTH_PARAMS
+    )
+    if response.status_code != 200:
+        return "Director: Unknown\nCast: Unknown"
+    
+    data = response.json()
+    cast = [c.get("name") for c in data.get("cast", [])[:5]]
+    directors = [c.get("name") for c in data.get("crew", []) if c.get("job") == "Director"]
+    
+    cast_str = ", ".join(cast) if cast else "Unknown"
+    dir_str = ", ".join(directors) if directors else "Unknown"
+    return f"Director: {dir_str}\nCast: {cast_str}"
 
-def build_storyline_blob(movie: Dict, genre_lookup: Dict[int, str], wikipedia_plot: Optional[str]) -> str:
+def build_storyline_blob(movie: Dict, genre_lookup: Dict[int, str], wikipedia_plot: Optional[str], credits_text: str) -> str:
     genre_names = [genre_lookup.get(gid, f"Genre-{gid}") for gid in movie.get("genre_ids", [])]
     genre_text = ", ".join(genre_names) if genre_names else "Unknown genres"
     title = movie.get("title", "Unknown Title")
     overview = movie.get("overview", "").strip() or "No synopsis available."
+    
+    base_text = f"Title: {title}\nGenres: {genre_text}\n{credits_text}\n"
+    
     if wikipedia_plot:
-        return f"Title: {title}\nGenres: {genre_text}\nDetailed Plot: {wikipedia_plot}"
-    return f"Title: {title}\nGenres: {genre_text}\nOverview: {overview}"
+        return base_text + f"Detailed Plot: {wikipedia_plot}"
+    return base_text + f"Overview: {overview}"
 
 
 async def fetch_genres(client: httpx.AsyncClient) -> Dict[int, str]:
@@ -167,15 +186,17 @@ async def upsert_embeddings(movies: List[Dict], genre_lookup: Dict[int, str]) ->
             wikipedia_plot: Optional[str] = None
             try:
                 wikipedia_plot = await fetch_wikipedia_plot(wiki_client, title, release_date)
+                credits_text = await fetch_movie_credits(wiki_client, movie_id) # NEW
             except Exception as wiki_error:
-                print(f"Wikipedia fetch failed for '{title}' ({movie_id}): {wiki_error}")
+                print(f"Fetch failed for '{title}' ({movie_id}): {wiki_error}")
                 wikipedia_plot = None
+                credits_text = "Director: Unknown\nCast: Unknown" # NEW
 
             prepared.append(
                 {
                     "movie_id": movie_id,
                     "title": title,
-                    "storyline_blob": build_storyline_blob(movie, genre_lookup, wikipedia_plot),
+                    "storyline_blob": build_storyline_blob(movie, genre_lookup, wikipedia_plot, credits_text), # UPDATED
                 }
             )
             await asyncio.sleep(0.1)

@@ -14,7 +14,7 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
 
 _embedding_client = OpenAIEmbeddings(model=EMBEDDING_MODEL)
-_chat_client = ChatOpenAI(model=CHAT_MODEL, temperature=0.75)
+_chat_client = ChatOpenAI(model=CHAT_MODEL, temperature=0.1)
 
 
 @tool("apply_discover_filters")
@@ -49,6 +49,7 @@ def _build_prompt() -> ChatPromptTemplate:
             (
                 "human",
                 (
+                    "User Watch/Search History:\n{user_history}\n\n" # NEW
                     "Conversation so far:\n{conversation_history}\n\n"
                     "User query:\n{query}\n\n"
                     "Retrieved movie context:\n{movie_context}\n\n"
@@ -163,12 +164,14 @@ async def stream_cinematic_reply(
     query: str,
     conversation_history: Optional[List[Dict[str, Any]]],
     retrieved_movies: List[MovieEmbedding],
+    user_history: str # NEW
 ) -> AsyncGenerator[Dict[str, Any], None]:
     prompt = _build_prompt()
     messages = prompt.format_messages(
         query=query,
         conversation_history=_format_history(conversation_history),
         movie_context=_format_movie_context(retrieved_movies),
+        user_history=user_history # NEW
     )
 
     tool_buffers: Dict[int, Dict[str, str]] = {}
