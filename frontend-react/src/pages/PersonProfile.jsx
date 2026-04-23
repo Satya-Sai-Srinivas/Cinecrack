@@ -2,7 +2,6 @@ import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Camera, Cake, MapPin, ExternalLink } from 'lucide-react'
 import { fetchPerson } from '../api'
-import { MovieCard } from '../components/movie/MovieCard'
 import { SkeletonGrid } from '../components/ui/SkeletonCard'
 import { EmptyState } from '../components/ui/EmptyState'
 
@@ -22,9 +21,7 @@ export default function PersonProfile() {
   })
 
   const goBack = () => {
-    const from = location.state?.from
-    if (from) navigate(from)
-    else navigate(-1)
+    navigate(-1);
   }
 
   if (isLoading) {
@@ -113,12 +110,11 @@ export default function PersonProfile() {
       {person.credits?.length === 0 ? (
         <EmptyState title="No filmography data available." />
       ) : (
-        <div className="movie-grid">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 w-full">
           {person.credits.map((credit) => (
             <Link
               key={credit.id}
               to={`/movie/${credit.id}`}
-              state={{ from: `/person/${id}` }}
               className="group block"
             >
               <div className="relative overflow-hidden rounded-xl aspect-[2/3] bg-[var(--surface)] border border-[var(--border-color)] shadow-sm transition-transform duration-200 group-hover:-translate-y-1">
