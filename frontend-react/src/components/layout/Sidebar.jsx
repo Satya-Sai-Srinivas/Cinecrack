@@ -21,7 +21,7 @@ export default function Sidebar() {
           C
         </div>
         <h1 className="text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[var(--text-main)] to-[var(--accent)]">
-          Cinerack
+          Cinecrack
         </h1>
       </div>
 

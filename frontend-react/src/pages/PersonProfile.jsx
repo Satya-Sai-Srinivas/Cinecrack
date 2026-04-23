@@ -21,9 +21,7 @@ export default function PersonProfile() {
   })
 
   const goBack = () => {
-    const from = location.state?.from
-    if (from) navigate(from)
-    else navigate(-1)
+    navigate(-1);
   }
 
   if (isLoading) {
@@ -117,7 +115,6 @@ export default function PersonProfile() {
             <Link
               key={credit.id}
               to={`/movie/${credit.id}`}
-              state={{ from: `/person/${id}` }}
               className="group block"
             >
               <div className="relative overflow-hidden rounded-xl aspect-[2/3] bg-[var(--surface)] border border-[var(--border-color)] shadow-sm transition-transform duration-200 group-hover:-translate-y-1">

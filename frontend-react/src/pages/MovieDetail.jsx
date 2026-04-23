@@ -54,9 +54,7 @@ export default function MovieDetail() {
   })
 
   const goBack = () => {
-    const from = location.state?.from
-    if (from) navigate(from)
-    else navigate(-1)
+    navigate(-1);
   }
 
   if (isLoading) {

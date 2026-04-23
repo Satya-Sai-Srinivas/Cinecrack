@@ -24,7 +24,6 @@ function CompactMovieCard({ movie }) {
   return (
     <Link
       to={`/movie/${movie.id}`}
-      state={{ from: '/chat' }}
       className="flex-shrink-0 w-28 group"
     >
       <div className="overflow-hidden rounded-lg aspect-[2/3] bg-[var(--surface)] border border-[var(--border-color)] shadow-md transition-all duration-300 group-hover:shadow-lg group-hover:shadow-[var(--accent)]/20">
