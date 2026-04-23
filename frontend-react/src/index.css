@@ -35,3 +35,23 @@
     @apply bg-[var(--bg-color)] text-[var(--text-main)] font-sans antialiased transition-colors duration-300;
   }
 }
+
+/* Add to index.css */
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  /* Enables native momentum scrolling on iOS */
+  .momentum-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    scroll-padding-left: 1.5rem; /* Matches your p-6 padding */
+  }
+  .snap-item {
+    scroll-snap-align: start;
+  }
+}

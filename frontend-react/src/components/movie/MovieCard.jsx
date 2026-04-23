@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 export default function MovieCard({ movie }) {
+  // State to track if the image has finished loading
+  const [isLoaded, setIsLoaded] = useState(false);
+
   return (
     <Link 
       to={`/movie/${movie.id}`} 
@@ -8,23 +12,30 @@ export default function MovieCard({ movie }) {
     >
       <div className="aspect-[2/3] w-full overflow-hidden bg-[var(--surface)] relative">
         {movie.poster_url ? (
-          <img
-            src={movie.poster_url}
-            alt={movie.title}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
-          />
+          <>
+            {/* Loading Skeleton underneath */}
+            {!isLoaded && <div className="absolute inset-0 animate-pulse bg-[var(--border-color)]/50" />}
+            
+            <img
+              src={movie.poster_url}
+              alt={movie.title}
+              loading="lazy"
+              onLoad={() => setIsLoaded(true)}
+              // The image stays opacity-0 until loaded, then smoothly fades to opacity-100
+              className={`h-full w-full object-cover transition-all duration-700 ease-out group-hover:scale-110 ${
+                isLoaded ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'
+              }`}
+            />
+          </>
         ) : (
           <div className="flex h-full items-center justify-center text-[var(--text-muted)]">
             <span className="text-sm font-medium tracking-wide">No Image</span>
           </div>
         )}
         
-        {/* Cinematic Vignette Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-[#020617]/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
       </div>
 
-      {/* Title Reveal */}
       <div className="absolute bottom-0 left-0 w-full p-4 translate-y-6 opacity-0 transition-all duration-500 ease-out group-hover:translate-y-0 group-hover:opacity-100">
         <h3 className="font-bold text-white line-clamp-2 text-md leading-snug drop-shadow-lg">
           {movie.title}
