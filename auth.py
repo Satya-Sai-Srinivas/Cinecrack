@@ -8,19 +8,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 security = HTTPBearer()
-CLERK_ISSUER = os.getenv("CLERK_ISSUER")
+# Add a default empty string to satisfy the type checker
+CLERK_ISSUER = os.getenv("CLERK_ISSUER", "") 
 
-# Fetch Clerk's public JWKS to decode the tokens
-def get_clerk_jwks():
+# Make this function async and use httpx.AsyncClient
+async def get_clerk_jwks():
     jwks_url = f"{CLERK_ISSUER}/.well-known/jwks.json"
-    response = httpx.get(jwks_url)
-    response.raise_for_status()
-    return response.json()
+    async with httpx.AsyncClient() as client:
+        response = await client.get(jwks_url)
+        response.raise_for_status()
+        return response.json()
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
     token = credentials.credentials
     try:
-        jwks = get_clerk_jwks()
+        # Await the new async function
+        jwks = await get_clerk_jwks() 
         
         # Verify the token against Clerk's public keys
         payload = jwt.decode(
@@ -31,8 +34,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
             options={"verify_aud": False} 
         )
         
-        # Return the Clerk User ID (a string like 'user_2bX...')
-        return payload.get("sub")
+        # Ensure the return type matches the -> str annotation
+        return str(payload.get("sub"))
         
     except JWTError as e:
         raise HTTPException(status_code=401, detail=f"Invalid authentication credentials: {str(e)}")

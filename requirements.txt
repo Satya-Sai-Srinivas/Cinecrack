@@ -22,3 +22,5 @@ openai
 langchain
 langchain-openai
 pgvector
+python-jose[cryptography]==3.3.0
+clerk-backend-api==5.0.6
