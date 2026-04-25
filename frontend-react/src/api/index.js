@@ -43,14 +43,28 @@ export const fetchHistory = () =>
 
 // ---------- Location ----------
 
-export const fetchLocation = async () => {
+export async function fetchLocation() {
   try {
-    const res = await fetch('https://ipapi.co/json/')
-    if (!res.ok) return null
-    const data = await res.json()
-    return { countryCode: data.country_code, city: data.city }
-  } catch {
-    return null
+    // Swapped from ipapi.co to ipwho.is for better free-tier rate limits
+    const response = await fetch('https://ipwho.is/');
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // ipwho.is returns success: true on valid requests
+    if (data.success) {
+      return {
+        countryCode: data.country_code,
+        city: data.city
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error("Location detection failed:", error);
+    return null;
   }
 }
 
