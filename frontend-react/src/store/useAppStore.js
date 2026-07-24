@@ -24,22 +24,18 @@ export const useThemeStore = create(
 export const useRegionStore = create((set) => ({
   currentRegion: 'US',
   currentLang: 'all',
-  currentCity: null,
   detectedRegion: null,
-  detectedCity: null,
 
-  setRegion: (region, city = null) =>
+  setRegion: (region) =>
     set((s) => ({
       currentRegion: region,
-      currentCity: city,
       // Reset language when switching to non-IN region
       currentLang: region === 'IN' ? s.currentLang : 'all',
     })),
 
   setLang: (lang) => set({ currentLang: lang }),
 
-  setDetected: (region, city) =>
-    set({ detectedRegion: region, detectedCity: city }),
+  setDetected: (region) => set({ detectedRegion: region }),
 }))
 
 // ---------- Chat store (session-like) ----------
