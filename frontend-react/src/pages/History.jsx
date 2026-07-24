@@ -3,6 +3,7 @@ import { History as HistoryIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useAuth } from '@clerk/clerk-react'
+import { fetchHistory } from '../api'
 
 export default function History() {
   // Grab the auth details from Clerk
@@ -13,14 +14,7 @@ export default function History() {
     queryKey: ['history'],
     queryFn: async () => {
       const token = await getToken()
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/history`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      if (!response.ok) throw new Error('Network response was not ok')
-      return response.json()
+      return fetchHistory(token)
     },
     enabled: isLoaded && isSignedIn, // Only fetch if Clerk is ready AND the user is logged in
     staleTime: 60 * 1000,

@@ -56,6 +56,17 @@
   .snap-item {
     scroll-snap-align: start;
   }
+  /* Horizontal scroll-snap row (chatbot recommendation strip) */
+  .snap-row {
+    scroll-snap-type: x proximity;
+  }
+  .snap-row > * {
+    scroll-snap-align: start;
+  }
+  /* Respect the iOS/Android home-indicator inset */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
   /* Loading placeholder shimmer — adapts to light/dark via CSS vars */
   .skeleton {
     background: linear-gradient(
