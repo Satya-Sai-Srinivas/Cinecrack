@@ -1,5 +1,6 @@
-import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '@clerk/clerk-react'
 import { ArrowLeft, Play, ExternalLink, Calendar, Tv, User } from 'lucide-react'
 import { fetchMovieDetail } from '../api'
 import { useRegionStore } from '../store/useAppStore'
@@ -8,8 +9,6 @@ const PLACEHOLDER_POSTER = 'https://placehold.co/300x450/1e293b/94a3b8?text=No+I
 const PLACEHOLDER_PERSON = 'https://placehold.co/150x225/1e293b/94a3b8?text=No+Image'
 
 function PersonCard({ person, movieId }) {
-  const navigate = useNavigate()
-
   return (
     <Link
       to={`/person/${person.id}`}
@@ -43,12 +42,15 @@ function PersonCard({ person, movieId }) {
 export default function MovieDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const location = useLocation()
+  const { getToken, isSignedIn } = useAuth()
   const { currentRegion } = useRegionStore()
 
   const { data: movie, isLoading, isError } = useQuery({
     queryKey: ['movie', id, currentRegion],
-    queryFn: () => fetchMovieDetail(id, currentRegion),
+    queryFn: async () => {
+      const token = isSignedIn ? await getToken() : null
+      return fetchMovieDetail(id, currentRegion, token)
+    },
     staleTime: 15 * 60 * 1000,
     enabled: Boolean(id),
   })

@@ -37,8 +37,10 @@ export const fetchNowPlaying = ({ region, lang, page = 1 }) =>
 export const fetchSearchMovies = ({ query, page = 1 }) =>
   get(`${BASE}/movies/search`, { query, page })
 
-export const fetchMovieDetail = (movieId, region) =>
-  get(`${BASE}/movies/${movieId}`, { region })
+export const fetchMovieDetail = (movieId, region, token) => {
+  const qs = region ? `?region=${encodeURIComponent(region)}` : ''
+  return authFetch(`${BASE}/movies/${movieId}${qs}`, { token })
+}
 
 export const fetchDiscover = (filters) =>
   get(`${BASE}/movies/discover`, filters)
@@ -71,6 +73,9 @@ export const addToWatchlist = (token, movieId, status = 'WATCHLIST') =>
 export const removeFromWatchlist = (token, movieId) =>
   authFetch(`${BASE}/user/watchlist/${movieId}`, { token, method: 'DELETE' })
 
+export const fetchWatchlistMovies = (token) =>
+  authFetch(`${BASE}/user/watchlist/movies`, { token })
+
 // ---------- Location ----------
 
 export async function fetchLocation() {
@@ -99,15 +104,18 @@ export async function fetchLocation() {
 }
 
 // ---------- AI Chat (SSE) ----------
-export async function streamChat(query, conversationHistory) {
+export async function streamChat(query, conversationHistory, token) {
   const res = await fetch(`${API_DOMAIN}${BASE}/ai/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({
       query,
       conversation_history: conversationHistory,
     }),
   });
   if (!res.ok) throw new Error(`Chat API error ${res.status}`);
-  return res.body; 
+  return res.body;
 }

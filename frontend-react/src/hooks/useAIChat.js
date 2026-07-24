@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@clerk/clerk-react'
 import { streamChat } from '../api'
 import { useChatStore } from '../store/useAppStore'
 
@@ -15,6 +16,7 @@ import { useChatStore } from '../store/useAppStore'
  */
 export function useAIChat() {
   const navigate = useNavigate()
+  const { getToken, isSignedIn } = useAuth()
   const { history, addMessage, updateLastAssistant } = useChatStore()
 
   const [isStreaming, setIsStreaming] = useState(false)
@@ -44,7 +46,8 @@ export function useAIChat() {
       let buffer = ''
 
       try {
-        const body = await streamChat(trimmed, historyToSend)
+        const token = isSignedIn ? await getToken() : null
+        const body = await streamChat(trimmed, historyToSend, token)
         const reader = body.getReader()
         const decoder = new TextDecoder()
 
@@ -103,7 +106,7 @@ export function useAIChat() {
         setIsStreaming(false)
       }
     },
-    [history, isStreaming, addMessage, updateLastAssistant, navigate]
+    [history, isStreaming, addMessage, updateLastAssistant, navigate, getToken, isSignedIn]
   )
 
   const cancelStream = useCallback(() => {
@@ -128,7 +131,6 @@ function handleToolCall(payload, navigate) {
   const params = new URLSearchParams()
 
   if (args.genre_id)    params.set('genre',       args.genre_id)
-  if (args.language)    params.set('language',     args.language)
   if (args.start_year) {
     params.set('year_min', args.start_year)
     params.set('year_max', args.start_year + 9)

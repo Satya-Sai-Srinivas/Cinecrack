@@ -12,6 +12,7 @@ import CinemaHub from './pages/CinemaHub'
 import MovieDetail from './pages/MovieDetail'
 import PersonProfile from './pages/PersonProfile'
 import History from './pages/History'
+import Watchlist from './pages/Watchlist'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="regional-hub" element={<CinemaHub />} />
               <Route path="movie/:id" element={<MovieDetail />} />
               <Route path="person/:id" element={<PersonProfile />} />
+              <Route path="watchlist" element={<Watchlist />} />
               <Route path="history" element={<History />} />
             </Route>
           </Routes>

@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, HttpUrl, Field
 from datetime import datetime, timedelta
-from auth import get_current_user
+from auth import get_current_user, get_optional_user
 from database import Watchlist, User, ChatThread # Add the new tables
 from models import WatchlistRequest, WatchlistResponse # Add the new models
 from fastapi import Request
@@ -291,6 +291,72 @@ async def hydrate_ai_movie_cards(
     return cards
 
 
+async def hydrate_movie_previews(db: AsyncSession, movie_ids: List[int]) -> List["MoviePreview"]:
+    """Turn a list of movie_ids into MoviePreview cards, using MovieCache first
+    and falling back to concurrent TMDB lookups for anything not cached."""
+    if not movie_ids:
+        return []
+
+    cache_result = await db.execute(
+        select(MovieCache).where(MovieCache.movie_id.in_(movie_ids))
+    )
+    cached = {entry.movie_id: entry.movie_data for entry in cache_result.scalars().all()}
+
+    async def fetch_card(client: httpx.AsyncClient, movie_id: int) -> Optional[Dict[str, Any]]:
+        try:
+            response = await client.get(
+                f"{BASE_URL}/movie/{movie_id}", headers=HEADERS, params=AUTH_PARAMS
+            )
+            if response.status_code == 200:
+                payload = response.json()
+                return {
+                    "title": payload.get("title", "Unknown"),
+                    "poster_url": (
+                        f"https://image.tmdb.org/t/p/w500{payload['poster_path']}"
+                        if payload.get("poster_path")
+                        else None
+                    ),
+                    "release_date": payload.get("release_date"),
+                }
+        except httpx.HTTPError:
+            pass
+        return None
+
+    missing = [movie_id for movie_id in movie_ids if movie_id not in cached]
+    fetched: Dict[int, Optional[Dict[str, Any]]] = {}
+    if missing:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            results = await asyncio.gather(
+                *[fetch_card(client, movie_id) for movie_id in missing],
+                return_exceptions=True,
+            )
+            for movie_id, res in zip(missing, results):
+                fetched[movie_id] = res if isinstance(res, dict) else None
+
+    previews: List[MoviePreview] = []
+    for movie_id in movie_ids:
+        data = cached.get(movie_id)
+        if data:
+            title = data.get("title", "Unknown")
+            poster = data.get("poster_url")
+            release_raw = (data.get("release_details") or {}).get("theatrical_release_date")
+        else:
+            card = fetched.get(movie_id)
+            if not card:
+                continue
+            title, poster, release_raw = card["title"], card["poster_url"], card["release_date"]
+
+        previews.append(
+            MoviePreview(
+                id=movie_id,
+                title=title,
+                poster_url=poster,
+                release_date=safe_parse_date(release_raw),
+            )
+        )
+    return previews
+
+
 def _sse_event(payload: Dict[str, Any]) -> str:
     return f"data: {json.dumps(payload)}\n\n"
 
@@ -445,7 +511,11 @@ async def discover_movies(
 
 
 @app.post("/api/v1/ai/chat")
-async def ai_chat(payload: AIChatRequest, db: AsyncSession = Depends(get_db)):
+async def ai_chat(
+    payload: AIChatRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[str] = Depends(get_optional_user),
+):
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(
             status_code=500,
@@ -472,17 +542,46 @@ async def ai_chat(payload: AIChatRequest, db: AsyncSession = Depends(get_db)):
     if payload.conversation_history:
         history_payload = [turn.model_dump() for turn in payload.conversation_history]
 
-    history_result = await db.execute(
-        select(SearchHistory).order_by(SearchHistory.searched_at.desc()).limit(15)
-    )
-    recent_history_records = history_result.scalars().all()
-    
-    if recent_history_records:
-        # Extract unique titles while preserving the chronological order
-        history_titles = list(dict.fromkeys([h.movie_title for h in recent_history_records]))
-        user_history_str = ", ".join(history_titles)
+    if user_id:
+        # Recently viewed movies (this user only)
+        viewed_result = await db.execute(
+            select(SearchHistory)
+            .where(SearchHistory.user_id == user_id)
+            .order_by(SearchHistory.searched_at.desc())
+            .limit(15)
+        )
+        viewed_titles = list(
+            dict.fromkeys([h.movie_title for h in viewed_result.scalars().all()])
+        )
+
+        # Saved watchlist titles (resolved via the movie cache)
+        watchlist_result = await db.execute(
+            select(Watchlist.movie_id).where(Watchlist.user_id == user_id)
+        )
+        watchlist_ids = list(watchlist_result.scalars().all())
+        saved_titles: List[str] = []
+        if watchlist_ids:
+            saved_cache = await db.execute(
+                select(MovieCache).where(MovieCache.movie_id.in_(watchlist_ids))
+            )
+            saved_titles = [
+                (entry.movie_data or {}).get("title")
+                for entry in saved_cache.scalars().all()
+                if (entry.movie_data or {}).get("title")
+            ]
+
+        history_parts: List[str] = []
+        if viewed_titles:
+            history_parts.append("Recently viewed: " + ", ".join(viewed_titles))
+        if saved_titles:
+            history_parts.append("Saved to watchlist: " + ", ".join(saved_titles))
+        user_history_str = (
+            "\n".join(history_parts)
+            if history_parts
+            else "The signed-in user has not viewed or saved any movies yet."
+        )
     else:
-        user_history_str = "The user has not watched or searched for any movies yet."
+        user_history_str = "The user is browsing anonymously (no personal history available)."
 
     async def event_generator():
         try:
@@ -568,7 +667,12 @@ async def get_regional_hub():
 
 
 @app.get("/api/v1/movies/{movie_id}", response_model=MovieDetailResponse)
-async def get_movie_details(movie_id: int, region: str = "US", db: AsyncSession = Depends(get_db)):
+async def get_movie_details(
+    movie_id: int,
+    region: str = "US",
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[str] = Depends(get_optional_user),
+):
     result = await db.execute(select(MovieCache).where(MovieCache.movie_id == movie_id))
     cached_movie = result.scalars().first()
     
@@ -684,7 +788,8 @@ async def get_movie_details(movie_id: int, region: str = "US", db: AsyncSession 
             db.add(new_cache_entry)
 
     new_history = SearchHistory(
-        movie_id=movie_id, 
+        user_id=user_id,
+        movie_id=movie_id,
         movie_title=movie_title
     )
     db.add(new_history)
@@ -775,6 +880,19 @@ async def get_watchlist(
     items = result.scalars().all()
     return items
 
+@app.get("/api/v1/user/watchlist/movies", response_model=List[MoviePreview])
+async def get_watchlist_movies(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    result = await db.execute(
+        select(Watchlist)
+        .where(Watchlist.user_id == user_id)
+        .order_by(Watchlist.added_at.desc())
+    )
+    movie_ids = [w.movie_id for w in result.scalars().all()]
+    return await hydrate_movie_previews(db, movie_ids)
+
 @app.delete("/api/v1/user/watchlist/{movie_id}")
 async def remove_from_watchlist(
     movie_id: int,
@@ -795,6 +913,11 @@ async def get_search_history(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user) # <--- This secures the endpoint!
 ):
-    result = await db.execute(select(SearchHistory).order_by(SearchHistory.searched_at.desc()).limit(10))
+    result = await db.execute(
+        select(SearchHistory)
+        .where(SearchHistory.user_id == user_id)
+        .order_by(SearchHistory.searched_at.desc())
+        .limit(50)
+    )
     history = result.scalars().all()
     return history

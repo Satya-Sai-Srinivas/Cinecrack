@@ -17,11 +17,10 @@ const LANG_OPTIONS = [
   { value: 'ml',  label: 'Malayalam' },
 ]
 
-function getSectionTitle({ currentRegion, currentCity, currentLang, searchQuery }) {
+function getSectionTitle({ currentRegion, currentLang, searchQuery }) {
   if (searchQuery) {
     return `Results for "${searchQuery}"`
   }
-  if (currentCity) return `Now Playing in ${currentCity} Theaters`
   if (currentRegion === 'US') return 'Now Playing in US Theaters'
   if (currentRegion === 'IN') {
     const names = { all: 'Indian', te: 'Telugu', hi: 'Hindi', ta: 'Tamil', ml: 'Malayalam' }
@@ -33,7 +32,7 @@ function getSectionTitle({ currentRegion, currentCity, currentLang, searchQuery 
 export default function Home() {
   useLocationDetect()
 
-  const { currentRegion, currentLang, currentCity, detectedRegion, detectedCity, setRegion, setLang } =
+  const { currentRegion, currentLang, detectedRegion, setRegion, setLang } =
     useRegionStore()
 
   const [searchInput, setSearchInput] = useState('')
@@ -95,24 +94,19 @@ export default function Home() {
   // ---------- Market switching ----------
   const handleMarket = useCallback(
     (target) => {
-      if (target === 'LOCAL') {
-        setRegion(detectedRegion, detectedCity)
-      } else {
-        setRegion(target)
-      }
+      setRegion(target)
       if (isSearchMode) handleClearSearch()
     },
-    [detectedRegion, detectedCity, setRegion, isSearchMode, handleClearSearch]
+    [setRegion, isSearchMode, handleClearSearch]
   )
 
-  const activeMarket =
-    currentCity && currentCity === detectedCity
-      ? 'LOCAL'
-      : currentRegion
+  const activeMarket = currentRegion
+
+  // Offer the visitor's detected country as a market when it isn't already a preset button.
+  const showDetectedMarket = detectedRegion && !['US', 'IN'].includes(detectedRegion)
 
   const sectionTitle = getSectionTitle({
     currentRegion,
-    currentCity,
     currentLang,
     searchQuery,
   })
@@ -151,11 +145,11 @@ export default function Home() {
         {!isSearchMode && (
           <div className="flex flex-col gap-4 mb-10">
             <div className="flex items-center gap-3 flex-wrap">
-              {detectedCity && (
+              {showDetectedMarket && (
                 <MarketBtn
-                  label={<><MapPin size={14} className="inline mr-1.5" />{detectedCity}</>}
-                  active={activeMarket === 'LOCAL'}
-                  onClick={() => handleMarket('LOCAL')}
+                  label={<><MapPin size={14} className="inline mr-1.5" />{detectedRegion}</>}
+                  active={activeMarket === detectedRegion}
+                  onClick={() => handleMarket(detectedRegion)}
                 />
               )}
               <MarketBtn label="🇺🇸 United States" active={activeMarket === 'US'} onClick={() => handleMarket('US')} />

@@ -12,7 +12,7 @@ export function useLocationDetect() {
   useEffect(() => {
     fetchLocation().then((loc) => {
       if (loc?.countryCode) {
-        setDetected(loc.countryCode, loc.city)
+        setDetected(loc.countryCode)
       }
     })
   }, [setDetected])

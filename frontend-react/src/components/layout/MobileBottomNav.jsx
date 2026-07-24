@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { Film, Compass, Globe, History } from 'lucide-react'
+import { Film, Compass, Globe, Bookmark, History } from 'lucide-react'
 
 const TABS = [
   { to: '/', label: 'Home', icon: Film },
   { to: '/discover', label: 'Discover', icon: Compass },
   { to: '/regional-hub', label: 'Hub', icon: Globe },
+  { to: '/watchlist', label: 'Saved', icon: Bookmark },
   { to: '/history', label: 'History', icon: History },
 ]
 
@@ -18,7 +19,7 @@ export function MobileBottomNav() {
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center w-16 h-full gap-1 transition-all duration-300 ${
+              `flex flex-col items-center justify-center flex-1 min-w-0 h-full gap-1 transition-all duration-300 ${
                 isActive 
                   ? 'text-[var(--accent)] scale-110' 
                   : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
