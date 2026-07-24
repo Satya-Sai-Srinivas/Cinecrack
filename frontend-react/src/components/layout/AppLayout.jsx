@@ -17,7 +17,7 @@ export function AppLayout() {
         {/* Mobile Header */}
         <header className="md:hidden sticky top-0 z-[40] w-full h-14 bg-[var(--bg-color)]/80 backdrop-blur-xl border-b border-[var(--border-color)] flex items-center px-4">
           <span className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-[var(--text-main)] to-[var(--accent)] tracking-tight">
-            Cinerack
+            Cinecrack
           </span>
         </header>
         

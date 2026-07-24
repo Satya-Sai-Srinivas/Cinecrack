@@ -4,7 +4,7 @@ import { Film, Compass, Globe, History } from 'lucide-react'
 const TABS = [
   { to: '/', label: 'Home', icon: Film },
   { to: '/discover', label: 'Discover', icon: Compass },
-  { to: '/hub', label: 'Hub', icon: Globe },
+  { to: '/regional-hub', label: 'Hub', icon: Globe },
   { to: '/history', label: 'History', icon: History },
 ]
 
