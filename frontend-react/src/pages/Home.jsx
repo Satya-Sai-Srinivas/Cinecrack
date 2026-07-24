@@ -17,11 +17,9 @@ const LANG_OPTIONS = [
   { value: 'ml',  label: 'Malayalam' },
 ]
 
-function getSectionTitle({ currentRegion, currentCity, currentLang, searchQuery, searchCount }) {
+function getSectionTitle({ currentRegion, currentCity, currentLang, searchQuery }) {
   if (searchQuery) {
-    return searchCount !== undefined
-      ? `Results for "${searchQuery}" (${searchCount})`
-      : `Results for "${searchQuery}"`
+    return `Results for "${searchQuery}"`
   }
   if (currentCity) return `Now Playing in ${currentCity} Theaters`
   if (currentRegion === 'US') return 'Now Playing in US Theaters'
@@ -112,13 +110,11 @@ export default function Home() {
       ? 'LOCAL'
       : currentRegion
 
-  const totalCount = isSearchMode ? movies.length : undefined
   const sectionTitle = getSectionTitle({
     currentRegion,
     currentCity,
     currentLang,
     searchQuery,
-    searchCount: totalCount,
   })
 
   return (

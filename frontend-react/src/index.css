@@ -15,6 +15,7 @@
   --accent: #0284c7;
   --accent-hover: #0369a1;
   --border-color: #bae6fd;
+  --overlay-bg: rgba(255, 255, 255, 0.85); /* frosted chatbot panel (light) */
 }
 
 .dark {
@@ -27,6 +28,7 @@
   --accent: #38bdf8;
   --accent-hover: #0ea5e9;
   --border-color: #334155;
+  --overlay-bg: rgba(15, 23, 42, 0.85); /* frosted chatbot panel (dark) */
 }
 
 /* Keep only the @apply rules in the layer block */
@@ -53,5 +55,36 @@
   }
   .snap-item {
     scroll-snap-align: start;
+  }
+  /* Horizontal scroll-snap row (chatbot recommendation strip) */
+  .snap-row {
+    scroll-snap-type: x proximity;
+  }
+  .snap-row > * {
+    scroll-snap-align: start;
+  }
+  /* Respect the iOS/Android home-indicator inset */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* Loading placeholder shimmer — adapts to light/dark via CSS vars */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--surface) 25%,
+      var(--border-color) 37%,
+      var(--surface) 63%
+    );
+    background-size: 400% 100%;
+    animation: skeleton-shimmer 1.4s ease infinite;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
   }
 }

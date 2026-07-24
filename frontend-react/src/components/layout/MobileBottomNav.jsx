@@ -4,14 +4,14 @@ import { Film, Compass, Globe, History } from 'lucide-react'
 const TABS = [
   { to: '/', label: 'Home', icon: Film },
   { to: '/discover', label: 'Discover', icon: Compass },
-  { to: '/hub', label: 'Hub', icon: Globe },
+  { to: '/regional-hub', label: 'Hub', icon: Globe },
   { to: '/history', label: 'History', icon: History },
 ]
 
 export function MobileBottomNav() {
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 w-full h-16 bg-[var(--surface)]/90 backdrop-blur-xl border-t border-[var(--border-color)] z-[50] pb-safe">
-      <div className="flex items-center justify-around h-full px-2">
+    <nav className="md:hidden fixed bottom-0 left-0 w-full bg-[var(--surface)]/90 backdrop-blur-xl border-t border-[var(--border-color)] z-[50] pb-safe">
+      <div className="flex items-center justify-around h-16 px-2">
         {TABS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}

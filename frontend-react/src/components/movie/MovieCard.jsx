@@ -1,42 +1,15 @@
 import { Link } from 'react-router-dom';
 import { Bookmark } from 'lucide-react';
-import { useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
+import { useWatchlist } from '../../hooks/useWatchlist';
 
 export default function MovieCard({ movie }) {
-  const { getToken, isSignedIn } = useAuth();
-  const [isSaved, setIsSaved] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const { savedIds, toggle, isPending } = useWatchlist();
+  const isSaved = savedIds.has(movie.id);
 
-  const handleSave = async (e) => {
+  const handleSave = (e) => {
     e.preventDefault(); // Prevents the Link from triggering!
     e.stopPropagation();
-
-    if (!isSignedIn) {
-      alert("Please sign in to save movies!");
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const token = await getToken();
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/user/watchlist`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ movie_id: movie.id, status: 'WATCHLIST' })
-      });
-
-      if (response.ok) {
-        setIsSaved(!isSaved);
-      }
-    } catch (error) {
-      console.error("Failed to save movie", error);
-    } finally {
-      setIsSaving(false);
-    }
+    toggle(movie.id);
   };
 
   return (
@@ -63,10 +36,11 @@ export default function MovieCard({ movie }) {
       </div>
 
       {/* NEW: Bookmark Button */}
-      <button 
+      <button
         onClick={handleSave}
-        disabled={isSaving}
-        className="absolute top-3 right-3 z-10 p-2 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/20 opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-[var(--accent)] hover:border-[var(--accent)] disabled:opacity-50"
+        disabled={isPending}
+        aria-label={isSaved ? 'Remove from watchlist' : 'Add to watchlist'}
+        className={`absolute top-3 right-3 z-10 p-2 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/20 transition-all duration-300 hover:bg-[var(--accent)] hover:border-[var(--accent)] disabled:opacity-50 ${isSaved ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
       >
         <Bookmark size={18} fill={isSaved ? "currentColor" : "none"} className={isSaved ? "text-white" : ""} />
       </button>

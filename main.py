@@ -768,12 +768,27 @@ async def add_to_watchlist(
 
 @app.get("/api/v1/user/watchlist", response_model=List[WatchlistResponse])
 async def get_watchlist(
-    db: AsyncSession = Depends(get_db), 
+    db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user)
 ):
     result = await db.execute(select(Watchlist).where(Watchlist.user_id == user_id))
     items = result.scalars().all()
     return items
+
+@app.delete("/api/v1/user/watchlist/{movie_id}")
+async def remove_from_watchlist(
+    movie_id: int,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    result = await db.execute(
+        select(Watchlist).where(Watchlist.user_id == user_id, Watchlist.movie_id == movie_id)
+    )
+    entry = result.scalars().first()
+    if entry:
+        await db.delete(entry)
+        await db.commit()
+    return {"message": "Removed from watchlist"}
 
 @app.get("/api/v1/history")
 async def get_search_history(

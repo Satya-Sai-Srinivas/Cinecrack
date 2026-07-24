@@ -4,7 +4,7 @@ const BASE = '/api/v1';
 async function get(path, params = {}) {
   // FIX: Removed the extra ${BASE} here because your functions below already include it!
   const url = new URL(path, API_DOMAIN);
-  
+
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
   });
@@ -12,6 +12,21 @@ async function get(path, params = {}) {
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
   return res.json();
+}
+
+// Authenticated request that reuses the same API_DOMAIN + fallback as get().
+async function authFetch(path, { token, method = 'GET', body } = {}) {
+  const url = new URL(path, API_DOMAIN);
+  const res = await fetch(url.toString(), {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
+  return res.status === 204 ? null : res.json();
 }
 
 // ---------- Movies ----------
@@ -38,8 +53,23 @@ export const fetchPerson = (personId) =>
 
 // ---------- History ----------
 
-export const fetchHistory = () =>
-  get(`${BASE}/history`)
+export const fetchHistory = (token) =>
+  authFetch(`${BASE}/history`, { token })
+
+// ---------- Watchlist ----------
+
+export const fetchWatchlist = (token) =>
+  authFetch(`${BASE}/user/watchlist`, { token })
+
+export const addToWatchlist = (token, movieId, status = 'WATCHLIST') =>
+  authFetch(`${BASE}/user/watchlist`, {
+    token,
+    method: 'POST',
+    body: { movie_id: movieId, status },
+  })
+
+export const removeFromWatchlist = (token, movieId) =>
+  authFetch(`${BASE}/user/watchlist/${movieId}`, { token, method: 'DELETE' })
 
 // ---------- Location ----------
 

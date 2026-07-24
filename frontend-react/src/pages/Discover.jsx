@@ -38,7 +38,7 @@ const LANG_OPTIONS = [
 
 function buildFiltersFromParams(params) {
   return {
-    release_year_gte: params.get('year_min') || '2000',
+    release_year_gte: params.get('year_min') || '1900',
     release_year_lte: params.get('year_max') || String(CURRENT_YEAR),
     min_rating: params.get('min_rating') || '0',
     genre: params.get('genre') || '',
@@ -165,14 +165,14 @@ export default function Discover() {
               type="range" min="1900" max={CURRENT_YEAR}
               value={filters.release_year_gte}
               onChange={(e) => handleSliderChange('release_year_gte', e.target.value)}
-              onMouseUp={handleSliderCommit} onTouchEnd={handleSliderCommit}
+              onMouseUp={handleSliderCommit} onTouchEnd={handleSliderCommit} onKeyUp={handleSliderCommit}
               className="flex-1 accent-[var(--accent)]"
             />
             <input
               type="range" min="1900" max={CURRENT_YEAR}
               value={filters.release_year_lte}
               onChange={(e) => handleSliderChange('release_year_lte', e.target.value)}
-              onMouseUp={handleSliderCommit} onTouchEnd={handleSliderCommit}
+              onMouseUp={handleSliderCommit} onTouchEnd={handleSliderCommit} onKeyUp={handleSliderCommit}
               className="flex-1 accent-[var(--accent)]"
             />
           </div>
@@ -187,7 +187,7 @@ export default function Discover() {
             type="range" min="0" max="10" step="0.5"
             value={filters.min_rating}
             onChange={(e) => handleSliderChange('min_rating', e.target.value)}
-            onMouseUp={handleSliderCommit} onTouchEnd={handleSliderCommit}
+            onMouseUp={handleSliderCommit} onTouchEnd={handleSliderCommit} onKeyUp={handleSliderCommit}
             className="w-full accent-[var(--accent)]"
           />
         </FilterGroup>
@@ -210,7 +210,7 @@ export default function Discover() {
         <EmptyState title="No movies match these filters" subtitle="Try loosening your criteria." />
       ) : (
         <>
-          <p className="text-sm text-[var(--text-muted)] mb-4">{movies.length}+ result{movies.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-[var(--text-muted)] mb-4">Showing {movies.length} result{movies.length !== 1 ? 's' : ''}</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 w-full mt-6">
             {movies.map((movie) => (
               <MovieCard key={movie.id} movie={movie} sourceRef="discover" />

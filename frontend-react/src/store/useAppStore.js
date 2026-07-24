@@ -15,28 +15,8 @@ export const useThemeStore = create(
           document.documentElement.classList.remove('dark')
         }
       },
-      initTheme: () => {
-        const saved = localStorage.getItem('cinecrack-theme-storage')
-        if (saved) {
-          const parsed = JSON.parse(saved)
-          if (parsed?.state?.theme === 'dark') {
-            document.documentElement.classList.add('dark')
-          }
-        }
-      },
     }),
     { name: 'cinecrack-theme-storage' }
-  )
-)
-
-// ---------- Sidebar store (persisted) ----------
-export const useSidebarStore = create(
-  persist(
-    (set) => ({
-      collapsed: false,
-      toggle: () => set((s) => ({ collapsed: !s.collapsed })),
-    }),
-    { name: 'cinecrack-sidebar-storage' }
   )
 )
 
