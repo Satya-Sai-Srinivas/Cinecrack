@@ -7,13 +7,13 @@ import { useRegionStore } from '../store/useAppStore'
  * in the region store so the Home page can show the LOCAL button.
  */
 export function useLocationDetect() {
-  const setDetected = useRegionStore((s) => s.setDetected)
+  const applyDetectedDefault = useRegionStore((s) => s.applyDetectedDefault)
 
   useEffect(() => {
     fetchLocation().then((loc) => {
       if (loc?.countryCode) {
-        setDetected(loc.countryCode)
+        applyDetectedDefault(loc.countryCode)
       }
     })
-  }, [setDetected])
+  }, [applyDetectedDefault])
 }

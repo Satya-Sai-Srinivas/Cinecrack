@@ -45,8 +45,13 @@ export const fetchMovieDetail = (movieId, region, token) => {
 export const fetchDiscover = (filters) =>
   get(`${BASE}/movies/discover`, filters)
 
-export const fetchRegionalHub = () =>
-  get(`${BASE}/movies/regional-hub`)
+// ---------- Config (country / language lists) ----------
+
+export const fetchCountries = () =>
+  get(`${BASE}/config/countries`)
+
+export const fetchLanguages = () =>
+  get(`${BASE}/config/languages`)
 
 // ---------- Person ----------
 

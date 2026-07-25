@@ -24,18 +24,17 @@ export const useThemeStore = create(
 export const useRegionStore = create((set) => ({
   currentRegion: 'US',
   currentLang: 'all',
-  detectedRegion: null,
+  regionManuallySet: false,
 
+  // Switching country always resets the language to "all".
   setRegion: (region) =>
-    set((s) => ({
-      currentRegion: region,
-      // Reset language when switching to non-IN region
-      currentLang: region === 'IN' ? s.currentLang : 'all',
-    })),
+    set({ currentRegion: region, currentLang: 'all', regionManuallySet: true }),
 
   setLang: (lang) => set({ currentLang: lang }),
 
-  setDetected: (region) => set({ detectedRegion: region }),
+  // Geo detection sets the default country once, but never overrides a manual pick.
+  applyDetectedDefault: (region) =>
+    set((s) => (s.regionManuallySet ? {} : { currentRegion: region })),
 }))
 
 // ---------- Chat store (session-like) ----------

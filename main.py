@@ -612,58 +612,44 @@ async def ai_chat(
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
-# 🌟 MOVED UP: regional-hub must be above {movie_id} to prevent path collision
-@app.get("/api/v1/movies/regional-hub")
-async def get_regional_hub():
-    """Fetches multiple regional and international categories concurrently."""
-    
-    async def fetch_category(lang: str, extra_params: dict = None):
-        url = f"{BASE_URL}/discover/movie"
-        today = datetime.utcnow()
-        past_six_months = today - timedelta(days=180)
-        
-        params = {
-            "with_original_language": lang,
-            "sort_by": "popularity.desc",
-            "release_date.gte": past_six_months.strftime("%Y-%m-%d"),
-            "release_date.lte": today.strftime("%Y-%m-%d"),
-            "page": 1,
-            **AUTH_PARAMS
-        }
-        if extra_params:
-            params.update(extra_params)
-            
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=HEADERS, params=params)
-            if response.status_code == 200:
-                data = response.json()
-                movies = []
-                for item in data.get("results", [])[:15]:
-                    poster = f"https://image.tmdb.org/t/p/w500{item['poster_path']}" if item.get('poster_path') else None
-                    movies.append(MoviePreview(
-                        id=item["id"], 
-                        title=item["title"], 
-                        poster_url=poster, 
-                        release_date=safe_parse_date(item.get("release_date"))
-                    ))
-                return [m.model_dump(mode='json') for m in movies]
-            return []
+# --- Config endpoints (country / language pickers) ---
+_config_cache: Dict[str, List[Dict[str, str]]] = {}
 
-    t_task = fetch_category("te") 
-    b_task = fetch_category("hi") 
-    k_task = fetch_category("ta") 
-    m_task = fetch_category("ml") 
-    i_task = fetch_category("ko|ja|fr|es") 
 
-    t, b, k, m, i = await asyncio.gather(t_task, b_task, k_task, m_task, i_task)
+async def _load_tmdb_config(kind: str, path: str, id_field: str) -> List[Dict[str, str]]:
+    """Cached proxy of a TMDB /configuration list (countries or languages)."""
+    if kind in _config_cache:
+        return _config_cache[kind]
 
-    return {
-        "tollywood": t,
-        "bollywood": b,
-        "kollywood": k,
-        "mollywood": m,
-        "international": i
-    }
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{BASE_URL}/{path}", headers=HEADERS, params=AUTH_PARAMS)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail=f"Failed to load {kind}")
+        data = response.json()
+
+    items = sorted(
+        [
+            {
+                "code": entry[id_field],
+                "name": entry.get("english_name") or entry.get("name") or entry[id_field],
+            }
+            for entry in data
+            if entry.get(id_field)
+        ],
+        key=lambda item: item["name"],
+    )
+    _config_cache[kind] = items
+    return items
+
+
+@app.get("/api/v1/config/countries")
+async def get_countries():
+    return await _load_tmdb_config("countries", "configuration/countries", "iso_3166_1")
+
+
+@app.get("/api/v1/config/languages")
+async def get_languages():
+    return await _load_tmdb_config("languages", "configuration/languages", "iso_639_1")
 
 
 @app.get("/api/v1/movies/{movie_id}", response_model=MovieDetailResponse)

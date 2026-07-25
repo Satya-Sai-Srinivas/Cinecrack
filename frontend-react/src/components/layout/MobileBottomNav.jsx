@@ -1,10 +1,9 @@
 import { NavLink } from 'react-router-dom'
-import { Film, Compass, Globe, Bookmark, History } from 'lucide-react'
+import { Film, Compass, Bookmark, History } from 'lucide-react'
 
 const TABS = [
   { to: '/', label: 'Home', icon: Film },
   { to: '/discover', label: 'Discover', icon: Compass },
-  { to: '/regional-hub', label: 'Hub', icon: Globe },
   { to: '/watchlist', label: 'Saved', icon: Bookmark },
   { to: '/history', label: 'History', icon: History },
 ]
