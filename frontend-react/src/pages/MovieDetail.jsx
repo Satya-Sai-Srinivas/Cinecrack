@@ -1,10 +1,11 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
-import { ArrowLeft, Play, ExternalLink, Calendar, Tv, User } from 'lucide-react'
+import { ArrowLeft, Play, ExternalLink, Calendar, User } from 'lucide-react'
 import { fetchMovieDetail } from '../api'
 import { useRegionStore } from '../store/useAppStore'
 import MovieActions from '../components/movie/MovieActions'
+import WhereToWatch from '../components/movie/WhereToWatch'
 
 const PLACEHOLDER_POSTER = 'https://placehold.co/300x450/1e293b/94a3b8?text=No+Image'
 const PLACEHOLDER_PERSON = 'https://placehold.co/150x225/1e293b/94a3b8?text=No+Image'
@@ -134,28 +135,8 @@ export default function MovieDetail() {
             )}
           </div>
 
-          {/* OTT platforms */}
-          {release_details?.available_on?.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <Tv size={14} className="text-[var(--text-muted)]" />
-              {release_details.available_on.map((p) => (
-                <a
-                  key={p.name}
-                  href={p.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-semibold text-[var(--accent)] hover:text-[var(--accent-hover)] border border-[var(--border-color)] px-2.5 py-1 rounded-lg hover:border-[var(--accent)] transition-colors"
-                >
-                  {p.name}
-                </a>
-              ))}
-            </div>
-          )}
-          {release_details?.available_on?.length === 0 && (
-            <p className="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
-              <Tv size={13} /> Not currently available to stream.
-            </p>
-          )}
+          {/* Where to watch (streaming availability + your services) */}
+          <WhereToWatch movieId={movie.id} />
 
           {/* User actions: Watchlist / Watched / Like / Dislike */}
           <MovieActions movieId={movie.id} />

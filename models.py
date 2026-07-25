@@ -96,6 +96,11 @@ class ReactionRequest(BaseModel):
     movie_id: int
     reaction: str = Field(..., description="Must be 'LIKE' or 'DISLIKE'")
 
+class SubscriptionRequest(BaseModel):
+    provider_id: int
+    provider_name: Optional[str] = None
+    region: str
+
 class WatchlistResponse(BaseModel):
     id: int
     user_id: str

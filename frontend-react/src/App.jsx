@@ -12,6 +12,7 @@ import MovieDetail from './pages/MovieDetail'
 import PersonProfile from './pages/PersonProfile'
 import History from './pages/History'
 import Watchlist from './pages/Watchlist'
+import Settings from './pages/Settings'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,6 +49,7 @@ export default function App() {
               <Route path="person/:id" element={<PersonProfile />} />
               <Route path="watchlist" element={<Watchlist />} />
               <Route path="history" element={<History />} />
+              <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>
         </ToastProvider>

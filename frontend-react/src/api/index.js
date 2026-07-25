@@ -98,6 +98,30 @@ export const setReaction = (token, movieId, reaction) =>
 export const clearReaction = (token, movieId) =>
   authFetch(`${BASE}/user/reactions/${movieId}`, { token, method: 'DELETE' })
 
+// ---------- Streaming providers / subscriptions ----------
+
+export const fetchProviders = (region) =>
+  get(`${BASE}/config/providers`, { region })
+
+export const fetchSubscriptions = (token) =>
+  authFetch(`${BASE}/user/subscriptions`, { token })
+
+export const addSubscription = (token, { provider_id, provider_name, region }) =>
+  authFetch(`${BASE}/user/subscriptions`, {
+    token,
+    method: 'POST',
+    body: { provider_id, provider_name, region },
+  })
+
+export const removeSubscription = (token, providerId, region) =>
+  authFetch(`${BASE}/user/subscriptions/${providerId}?region=${encodeURIComponent(region)}`, {
+    token,
+    method: 'DELETE',
+  })
+
+export const fetchMovieProviders = (movieId, region, token) =>
+  authFetch(`${BASE}/movies/${movieId}/providers?region=${encodeURIComponent(region)}`, { token })
+
 // ---------- Location ----------
 
 export async function fetchLocation() {

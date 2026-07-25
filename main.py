@@ -14,8 +14,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, HttpUrl, Field
 from datetime import datetime, timedelta
 from auth import get_current_user, get_optional_user
-from database import Watchlist, User, ChatThread, Reaction # Add the new tables
-from models import WatchlistRequest, WatchlistResponse, ReactionRequest # Add the new models
+from database import Watchlist, User, ChatThread, Reaction, UserSubscription # Add the new tables
+from models import WatchlistRequest, WatchlistResponse, ReactionRequest, SubscriptionRequest # Add the new models
 from fastapi import Request
 import httpx
 
@@ -653,6 +653,42 @@ async def get_languages():
     return await _load_tmdb_config("languages", "configuration/languages", "iso_639_1")
 
 
+@app.get("/api/v1/config/providers")
+async def get_providers(region: str = "US"):
+    """Cached list of streaming providers available in a region (for the toggles)."""
+    region = (region or "US").upper()
+    cache_key = f"providers:{region}"
+    if cache_key in _config_cache:
+        return _config_cache[cache_key]
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"{BASE_URL}/watch/providers/movie",
+            headers=HEADERS,
+            params={"watch_region": region, **AUTH_PARAMS},
+        )
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="Failed to load providers")
+        data = response.json()
+
+    providers = sorted(
+        [
+            {
+                "provider_id": p["provider_id"],
+                "provider_name": p.get("provider_name", "Unknown"),
+                "logo_url": (
+                    f"https://image.tmdb.org/t/p/w92{p['logo_path']}" if p.get("logo_path") else None
+                ),
+                "priority": p.get("display_priority", 9999),
+            }
+            for p in data.get("results", [])
+        ],
+        key=lambda p: (p["priority"], p["provider_name"].lower()),
+    )
+    _config_cache[cache_key] = providers
+    return providers
+
+
 @app.get("/api/v1/movies/{movie_id}", response_model=MovieDetailResponse)
 async def get_movie_details(
     movie_id: int,
@@ -784,6 +820,59 @@ async def get_movie_details(
     await db.commit()
     
     return final_response_data
+
+@app.get("/api/v1/movies/{movie_id}/providers")
+async def get_movie_providers(
+    movie_id: int,
+    region: str = "US",
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[str] = Depends(get_optional_user),
+):
+    """Streaming availability for a movie in a region, flagging services the
+    signed-in user is subscribed to. Data from TMDB / JustWatch."""
+    region = (region or "US").upper()
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"{BASE_URL}/movie/{movie_id}/watch/providers",
+            headers=HEADERS,
+            params=AUTH_PARAMS,
+        )
+
+    region_data: Dict[str, Any] = {}
+    if response.status_code == 200:
+        region_data = ((response.json() or {}).get("results") or {}).get(region) or {}
+
+    subscribed_ids: set = set()
+    if user_id:
+        sub_result = await db.execute(
+            select(UserSubscription.provider_id).where(
+                UserSubscription.user_id == user_id,
+                UserSubscription.region == region,
+            )
+        )
+        subscribed_ids = set(sub_result.scalars().all())
+
+    def fmt(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return [
+            {
+                "provider_id": p["provider_id"],
+                "provider_name": p.get("provider_name", "Unknown"),
+                "logo_url": (
+                    f"https://image.tmdb.org/t/p/w92{p['logo_path']}" if p.get("logo_path") else None
+                ),
+                "subscribed": p["provider_id"] in subscribed_ids,
+            }
+            for p in items
+        ]
+
+    return {
+        "region": region,
+        "link": region_data.get("link"),
+        "flatrate": fmt(region_data.get("flatrate", [])),
+        "rent": fmt(region_data.get("rent", [])),
+        "buy": fmt(region_data.get("buy", [])),
+    }
 
 @app.get("/api/v1/person/{person_id}", response_model=PersonDetailResponse)
 async def get_person_details(person_id: int):
@@ -963,6 +1052,65 @@ async def clear_reaction(
         await db.delete(existing)
         await db.commit()
     return {"message": "Reaction cleared"}
+
+# --- Streaming subscriptions ---
+@app.get("/api/v1/user/subscriptions")
+async def get_subscriptions(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    result = await db.execute(select(UserSubscription).where(UserSubscription.user_id == user_id))
+    return [
+        {"provider_id": s.provider_id, "provider_name": s.provider_name, "region": s.region}
+        for s in result.scalars().all()
+    ]
+
+@app.post("/api/v1/user/subscriptions")
+async def add_subscription(
+    payload: SubscriptionRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    await ensure_user(db, user_id)
+    region = payload.region.upper()
+    result = await db.execute(
+        select(UserSubscription).where(
+            UserSubscription.user_id == user_id,
+            UserSubscription.provider_id == payload.provider_id,
+            UserSubscription.region == region,
+        )
+    )
+    if result.scalars().first() is None:
+        db.add(
+            UserSubscription(
+                user_id=user_id,
+                provider_id=payload.provider_id,
+                provider_name=payload.provider_name,
+                region=region,
+            )
+        )
+        await db.commit()
+    return {"message": "Subscription added"}
+
+@app.delete("/api/v1/user/subscriptions/{provider_id}")
+async def remove_subscription(
+    provider_id: int,
+    region: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    result = await db.execute(
+        select(UserSubscription).where(
+            UserSubscription.user_id == user_id,
+            UserSubscription.provider_id == provider_id,
+            UserSubscription.region == (region or "").upper(),
+        )
+    )
+    entry = result.scalars().first()
+    if entry:
+        await db.delete(entry)
+        await db.commit()
+    return {"message": "Subscription removed"}
 
 @app.get("/api/v1/history")
 async def get_search_history(

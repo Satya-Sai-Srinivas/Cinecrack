@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Film, Compass, Clock, Bookmark, Moon, Sun } from 'lucide-react';
+import { Film, Compass, Clock, Bookmark, Tv, Moon, Sun } from 'lucide-react';
 import { useThemeStore } from '../../store/useAppStore'; 
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react"
 
@@ -12,6 +12,7 @@ export default function Sidebar() {
     { name: 'Discover', path: '/discover', icon: Compass },
     { name: 'Watchlist', path: '/watchlist', icon: Bookmark },
     { name: 'History', path: '/history', icon: Clock },
+    { name: 'My Services', path: '/settings', icon: Tv },
   ];
 
   return (
