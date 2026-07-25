@@ -8,7 +8,6 @@ import { useThemeStore } from './store/useAppStore'
 // Pages (lazy-loaded for code splitting)
 import Home from './pages/Home'
 import Discover from './pages/Discover'
-import CinemaHub from './pages/CinemaHub'
 import MovieDetail from './pages/MovieDetail'
 import PersonProfile from './pages/PersonProfile'
 import History from './pages/History'
@@ -45,7 +44,6 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route index element={<Home />} />
               <Route path="discover" element={<Discover />} />
-              <Route path="regional-hub" element={<CinemaHub />} />
               <Route path="movie/:id" element={<MovieDetail />} />
               <Route path="person/:id" element={<PersonProfile />} />
               <Route path="watchlist" element={<Watchlist />} />

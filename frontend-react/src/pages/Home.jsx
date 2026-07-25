@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
-import { Search, X, MapPin } from 'lucide-react'
-import { fetchNowPlaying, fetchSearchMovies } from '../api'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { Search, X } from 'lucide-react'
+import { fetchNowPlaying, fetchSearchMovies, fetchCountries, fetchLanguages } from '../api'
 import { useRegionStore } from '../store/useAppStore'
 import { useLocationDetect } from '../hooks/useLocation'
 import { useIntersectionObserver } from '../hooks/useInfiniteScroll'
@@ -9,35 +9,40 @@ import MovieCard from '../components/movie/MovieCard'
 import { SkeletonGrid } from '../components/ui/SkeletonCard'
 import { EmptyState } from '../components/ui/EmptyState'
 
-const LANG_OPTIONS = [
-  { value: 'all', label: 'All' },
-  { value: 'te',  label: 'Telugu' },
-  { value: 'hi',  label: 'Hindi' },
-  { value: 'ta',  label: 'Tamil' },
-  { value: 'ml',  label: 'Malayalam' },
-]
-
-function getSectionTitle({ currentRegion, currentLang, searchQuery }) {
+function getSectionTitle({ countryName, languageName, searchQuery }) {
   if (searchQuery) {
     return `Results for "${searchQuery}"`
   }
-  if (currentRegion === 'US') return 'Now Playing in US Theaters'
-  if (currentRegion === 'IN') {
-    const names = { all: 'Indian', te: 'Telugu', hi: 'Hindi', ta: 'Tamil', ml: 'Malayalam' }
-    return `Now Playing in Theaters (${names[currentLang] ?? currentLang})`
-  }
-  return `Now Playing in Theaters (${currentRegion})`
+  const where = countryName || 'Theaters'
+  return languageName
+    ? `Now Playing in ${where} (${languageName})`
+    : `Now Playing in ${where}`
 }
 
 export default function Home() {
   useLocationDetect()
 
-  const { currentRegion, currentLang, detectedRegion, setRegion, setLang } =
-    useRegionStore()
+  const { currentRegion, currentLang, setRegion, setLang } = useRegionStore()
 
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const isSearchMode = Boolean(searchQuery)
+
+  // ---------- Country / language options (cached TMDB config) ----------
+  const { data: countries = [] } = useQuery({
+    queryKey: ['config', 'countries'],
+    queryFn: fetchCountries,
+    staleTime: Infinity,
+  })
+  const { data: languages = [] } = useQuery({
+    queryKey: ['config', 'languages'],
+    queryFn: fetchLanguages,
+    staleTime: Infinity,
+  })
+
+  const countryName = countries.find((c) => c.code === currentRegion)?.name
+  const languageName =
+    currentLang !== 'all' ? languages.find((l) => l.code === currentLang)?.name : null
 
   // ---------- Infinite query: now-playing ----------
   const nowPlayingQuery = useInfiniteQuery({
@@ -91,25 +96,7 @@ export default function Home() {
     if (e.key === 'Enter') handleSearch()
   }
 
-  // ---------- Market switching ----------
-  const handleMarket = useCallback(
-    (target) => {
-      setRegion(target)
-      if (isSearchMode) handleClearSearch()
-    },
-    [setRegion, isSearchMode, handleClearSearch]
-  )
-
-  const activeMarket = currentRegion
-
-  // Offer the visitor's detected country as a market when it isn't already a preset button.
-  const showDetectedMarket = detectedRegion && !['US', 'IN'].includes(detectedRegion)
-
-  const sectionTitle = getSectionTitle({
-    currentRegion,
-    currentLang,
-    searchQuery,
-  })
+  const sectionTitle = getSectionTitle({ countryName, languageName, searchQuery })
 
   return (
     <main className="flex-1 h-screen overflow-y-auto bg-[var(--bg-color)] transition-colors duration-300">
@@ -141,38 +128,35 @@ export default function Home() {
           </button>
         </section>
 
-        {/* Filters & Markets */}
+        {/* Filters: Country + Language */}
         {!isSearchMode && (
-          <div className="flex flex-col gap-4 mb-10">
-            <div className="flex items-center gap-3 flex-wrap">
-              {showDetectedMarket && (
-                <MarketBtn
-                  label={<><MapPin size={14} className="inline mr-1.5" />{detectedRegion}</>}
-                  active={activeMarket === detectedRegion}
-                  onClick={() => handleMarket(detectedRegion)}
-                />
-              )}
-              <MarketBtn label="🇺🇸 United States" active={activeMarket === 'US'} onClick={() => handleMarket('US')} />
-              <MarketBtn label="🇮🇳 India" active={activeMarket === 'IN'} onClick={() => handleMarket('IN')} />
+          <div className="flex flex-col sm:flex-row gap-4 mb-10 w-full max-w-2xl">
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Country</label>
+              <select
+                value={currentRegion}
+                onChange={(e) => setRegion(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10 transition-all"
+              >
+                {countries.map((c) => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                ))}
+              </select>
             </div>
 
-            {currentRegion === 'IN' && (
-              <div className="flex items-center gap-2 flex-wrap animate-in fade-in slide-in-from-left-4 duration-500">
-                {LANG_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setLang(opt.value)}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all ${
-                      currentLang === opt.value
-                        ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md'
-                        : 'bg-[var(--surface)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Language</label>
+              <select
+                value={currentLang}
+                onChange={(e) => setLang(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10 transition-all"
+              >
+                <option value="all">All Languages</option>
+                {languages.map((l) => (
+                  <option key={l.code} value={l.code}>{l.name}</option>
                 ))}
-              </div>
-            )}
+              </select>
+            </div>
           </div>
         )}
 
@@ -239,17 +223,3 @@ export default function Home() {
   )
 }
 
-function MarketBtn({ label, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-5 py-2.5 text-xs font-bold rounded-xl border transition-all ${
-        active
-          ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20 scale-105'
-          : 'bg-[var(--surface)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] hover:scale-105'
-      }`}
-    >
-      {label}
-    </button>
-  )
-}
