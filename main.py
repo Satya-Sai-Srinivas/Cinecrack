@@ -4,7 +4,7 @@ import os
 import json
 import urllib.parse
 import re
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, BackgroundTasks
 from datetime import date
 from typing import List, Optional, Any, Dict
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +25,7 @@ from sqlalchemy.future import select
 from database import get_db, MovieCache, SearchHistory, init_db
 from contextlib import asynccontextmanager
 from ai_services import generate_embedding, similarity_search_movies, stream_cinematic_reply
+from embedding_service import ensure_movie_embedding
 
 # --- Models Imports ---
 from models import MovieDetailResponse, ReleaseInfo, StreamingPlatform, CastMember, Technician, SocialMediaLinks, WorkReference, PersonDetailResponse, MovieCredit
@@ -836,25 +837,39 @@ async def get_person_details(person_id: int):
             credits=credits_list
         )
 
+async def ensure_user(db: AsyncSession, user_id: str) -> None:
+    """Create a users row on first sight (the caller is responsible for commit)."""
+    existing = await db.execute(select(User).where(User.id == user_id))
+    if existing.scalars().first() is None:
+        db.add(User(id=user_id))
+
+
 @app.post("/api/v1/user/watchlist")
 async def add_to_watchlist(
     payload: WatchlistRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user)
 ):
+    await ensure_user(db, user_id)
+
     # Check if the movie is already in this user's list
     result = await db.execute(
         select(Watchlist).where(Watchlist.user_id == user_id, Watchlist.movie_id == payload.movie_id)
     )
     existing_entry = result.scalars().first()
-    
+
     if existing_entry:
         existing_entry.status = payload.status
     else:
         new_entry = Watchlist(user_id=user_id, movie_id=payload.movie_id, status=payload.status)
         db.add(new_entry)
-        
+
     await db.commit()
+
+    # Embed-on-interaction: make sure this movie is in the recommender's pool.
+    background_tasks.add_task(ensure_movie_embedding, payload.movie_id)
+
     return {"message": "Watchlist updated successfully"}
 
 @app.get("/api/v1/user/watchlist", response_model=List[WatchlistResponse])
