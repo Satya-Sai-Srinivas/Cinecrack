@@ -19,6 +19,9 @@ WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 EMBEDDING_MODEL = "text-embedding-3-small"
 SEED_PAGES = int(os.getenv("EMBEDDING_SEED_PAGES", "5"))
 EMBEDDING_BATCH_SIZE = 50
+# Lite mode skips the slow per-movie Wikipedia + credits enrichment and embeds
+# from the TMDB title/genres/overview only — much faster for large seeds.
+LITE_MODE = os.getenv("EMBEDDING_LITE", "0") == "1"
 
 HEADERS = {"accept": "application/json"}
 WIKIPEDIA_HEADERS = {
@@ -184,13 +187,17 @@ async def upsert_embeddings(movies: List[Dict], genre_lookup: Dict[int, str]) ->
             title = movie.get("title", "Unknown Title")
             release_date = movie.get("release_date", "")
             wikipedia_plot: Optional[str] = None
-            try:
-                wikipedia_plot = await fetch_wikipedia_plot(wiki_client, title, release_date)
-                credits_text = await fetch_movie_credits(wiki_client, movie_id) # NEW
-            except Exception as wiki_error:
-                print(f"Fetch failed for '{title}' ({movie_id}): {wiki_error}")
-                wikipedia_plot = None
-                credits_text = "Director: Unknown\nCast: Unknown" # NEW
+            credits_text = ""
+
+            if not LITE_MODE:
+                try:
+                    wikipedia_plot = await fetch_wikipedia_plot(wiki_client, title, release_date)
+                    credits_text = await fetch_movie_credits(wiki_client, movie_id)
+                except Exception as wiki_error:
+                    print(f"Fetch failed for '{title}' ({movie_id}): {wiki_error}")
+                    wikipedia_plot = None
+                    credits_text = "Director: Unknown\nCast: Unknown"
+                await asyncio.sleep(0.1)
 
             prepared.append(
                 {
@@ -199,7 +206,6 @@ async def upsert_embeddings(movies: List[Dict], genre_lookup: Dict[int, str]) ->
                     "storyline_blob": build_storyline_blob(movie, genre_lookup, wikipedia_plot, credits_text), # UPDATED
                 }
             )
-            await asyncio.sleep(0.1)
 
     async with AsyncSessionLocal() as db:
         for offset in range(0, len(prepared), EMBEDDING_BATCH_SIZE):

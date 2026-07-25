@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy import Column, Integer, DateTime, Text, text, Index
+from sqlalchemy import Column, Integer, DateTime, Text, text, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from dotenv import load_dotenv
 from sqlalchemy import String
@@ -59,11 +59,38 @@ class Watchlist(Base):
 
 class ChatThread(Base):
     __tablename__ = "chat_threads"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, index=True, nullable=False)
     title = Column(String, default="New Conversation")
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class Reaction(Base):
+    __tablename__ = "reactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=False)
+    movie_id = Column(Integer, index=True, nullable=False)
+    reaction = Column(String, nullable=False)  # "LIKE" or "DISLIKE"
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "movie_id", name="uq_reaction_user_movie"),
+    )
+
+class UserSubscription(Base):
+    __tablename__ = "user_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=False)
+    provider_id = Column(Integer, nullable=False)
+    provider_name = Column(String, nullable=True)
+    region = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider_id", "region", name="uq_sub_user_provider_region"),
+    )
 
 class MovieEmbedding(Base):
     __tablename__ = "movie_embeddings"
