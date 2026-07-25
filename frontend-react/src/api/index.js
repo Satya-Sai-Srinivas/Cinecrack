@@ -78,8 +78,25 @@ export const addToWatchlist = (token, movieId, status = 'WATCHLIST') =>
 export const removeFromWatchlist = (token, movieId) =>
   authFetch(`${BASE}/user/watchlist/${movieId}`, { token, method: 'DELETE' })
 
-export const fetchWatchlistMovies = (token) =>
-  authFetch(`${BASE}/user/watchlist/movies`, { token })
+export const fetchWatchlistMovies = (token, status) => {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+  return authFetch(`${BASE}/user/watchlist/movies${qs}`, { token })
+}
+
+// ---------- Reactions (like / dislike) ----------
+
+export const fetchReactions = (token) =>
+  authFetch(`${BASE}/user/reactions`, { token })
+
+export const setReaction = (token, movieId, reaction) =>
+  authFetch(`${BASE}/user/reactions`, {
+    token,
+    method: 'POST',
+    body: { movie_id: movieId, reaction },
+  })
+
+export const clearReaction = (token, movieId) =>
+  authFetch(`${BASE}/user/reactions/${movieId}`, { token, method: 'DELETE' })
 
 // ---------- Location ----------
 
