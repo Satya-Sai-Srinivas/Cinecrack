@@ -14,8 +14,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, HttpUrl, Field
 from datetime import datetime, timedelta
 from auth import get_current_user, get_optional_user
-from database import Watchlist, User, ChatThread # Add the new tables
-from models import WatchlistRequest, WatchlistResponse # Add the new models
+from database import Watchlist, User, ChatThread, Reaction # Add the new tables
+from models import WatchlistRequest, WatchlistResponse, ReactionRequest # Add the new models
 from fastapi import Request
 import httpx
 
@@ -883,14 +883,16 @@ async def get_watchlist(
 
 @app.get("/api/v1/user/watchlist/movies", response_model=List[MoviePreview])
 async def get_watchlist_movies(
+    status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user)
 ):
-    result = await db.execute(
-        select(Watchlist)
-        .where(Watchlist.user_id == user_id)
-        .order_by(Watchlist.added_at.desc())
-    )
+    stmt = select(Watchlist).where(Watchlist.user_id == user_id)
+    if status:
+        stmt = stmt.where(Watchlist.status == status.upper())
+    stmt = stmt.order_by(Watchlist.added_at.desc())
+
+    result = await db.execute(stmt)
     movie_ids = [w.movie_id for w in result.scalars().all()]
     return await hydrate_movie_previews(db, movie_ids)
 
@@ -908,6 +910,59 @@ async def remove_from_watchlist(
         await db.delete(entry)
         await db.commit()
     return {"message": "Removed from watchlist"}
+
+# --- Reactions (like / dislike) ---
+@app.get("/api/v1/user/reactions")
+async def get_reactions(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    result = await db.execute(select(Reaction).where(Reaction.user_id == user_id))
+    return [{"movie_id": r.movie_id, "reaction": r.reaction} for r in result.scalars().all()]
+
+@app.post("/api/v1/user/reactions")
+async def set_reaction(
+    payload: ReactionRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    value = payload.reaction.upper()
+    if value not in ("LIKE", "DISLIKE"):
+        raise HTTPException(status_code=400, detail="reaction must be 'LIKE' or 'DISLIKE'")
+
+    await ensure_user(db, user_id)
+
+    result = await db.execute(
+        select(Reaction).where(Reaction.user_id == user_id, Reaction.movie_id == payload.movie_id)
+    )
+    existing = result.scalars().first()
+    if existing:
+        existing.reaction = value
+    else:
+        db.add(Reaction(user_id=user_id, movie_id=payload.movie_id, reaction=value))
+
+    await db.commit()
+
+    # Embed-on-interaction: a like/dislike is a strong taste signal.
+    background_tasks.add_task(ensure_movie_embedding, payload.movie_id)
+
+    return {"message": "Reaction saved"}
+
+@app.delete("/api/v1/user/reactions/{movie_id}")
+async def clear_reaction(
+    movie_id: int,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    result = await db.execute(
+        select(Reaction).where(Reaction.user_id == user_id, Reaction.movie_id == movie_id)
+    )
+    existing = result.scalars().first()
+    if existing:
+        await db.delete(existing)
+        await db.commit()
+    return {"message": "Reaction cleared"}
 
 @app.get("/api/v1/history")
 async def get_search_history(

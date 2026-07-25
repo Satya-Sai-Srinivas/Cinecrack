@@ -1,20 +1,19 @@
 import { Link } from 'react-router-dom';
-import { Bookmark } from 'lucide-react';
-import { useWatchlist } from '../../hooks/useWatchlist';
+import { Bookmark, Check } from 'lucide-react';
+import { useMovieStatus } from '../../hooks/useMovieStatus';
 
 export default function MovieCard({ movie }) {
-  const { savedIds, toggle, isPending } = useWatchlist();
+  const { savedIds, watchedIds, toggleSave, toggleWatched, isPending } = useMovieStatus();
   const isSaved = savedIds.has(movie.id);
+  const isWatched = watchedIds.has(movie.id);
 
-  const handleSave = (e) => {
-    e.preventDefault(); // Prevents the Link from triggering!
-    e.stopPropagation();
-    toggle(movie.id);
-  };
+  const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+  const handleSave = (e) => { stop(e); toggleSave(movie.id); };
+  const handleWatched = (e) => { stop(e); toggleWatched(movie.id); };
 
   return (
-    <Link 
-      to={`/movie/${movie.id}`} 
+    <Link
+      to={`/movie/${movie.id}`}
       className="group relative block overflow-hidden rounded-xl bg-[var(--surface)] shadow-md transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-[var(--accent)]/30 border border-[var(--border-color)]/30"
     >
       <div className="aspect-[2/3] w-full overflow-hidden bg-[var(--surface)] relative">
@@ -30,20 +29,42 @@ export default function MovieCard({ movie }) {
             <span className="text-sm font-medium tracking-wide">No Image</span>
           </div>
         )}
-        
+
         {/* Cinematic Vignette Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-[#020617]/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
       </div>
 
-      {/* NEW: Bookmark Button */}
-      <button
-        onClick={handleSave}
-        disabled={isPending}
-        aria-label={isSaved ? 'Remove from watchlist' : 'Add to watchlist'}
-        className={`absolute top-3 right-3 z-10 p-2 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/20 transition-all duration-300 hover:bg-[var(--accent)] hover:border-[var(--accent)] disabled:opacity-50 ${isSaved ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+      {/* Action cluster: Watched + Save */}
+      <div
+        className={`absolute top-3 right-3 z-10 flex gap-1.5 transition-all duration-300 ${
+          isSaved || isWatched ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}
       >
-        <Bookmark size={18} fill={isSaved ? "currentColor" : "none"} className={isSaved ? "text-white" : ""} />
-      </button>
+        <button
+          onClick={handleWatched}
+          disabled={isPending}
+          aria-label={isWatched ? 'Remove from watched' : 'Mark as watched'}
+          className={`p-2 rounded-full backdrop-blur-md border transition-all duration-300 disabled:opacity-50 ${
+            isWatched
+              ? 'bg-green-500 border-green-500 text-white'
+              : 'bg-black/40 border-white/20 text-white hover:bg-green-500 hover:border-green-500'
+          }`}
+        >
+          <Check size={16} />
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={isPending}
+          aria-label={isSaved ? 'Remove from watchlist' : 'Add to watchlist'}
+          className={`p-2 rounded-full backdrop-blur-md border transition-all duration-300 disabled:opacity-50 ${
+            isSaved
+              ? 'bg-[var(--accent)] border-[var(--accent)] text-white'
+              : 'bg-black/40 border-white/20 text-white hover:bg-[var(--accent)] hover:border-[var(--accent)]'
+          }`}
+        >
+          <Bookmark size={16} fill={isSaved ? 'currentColor' : 'none'} />
+        </button>
+      </div>
 
       {/* Title Reveal */}
       <div className="absolute bottom-0 left-0 w-full p-4 translate-y-6 opacity-0 transition-all duration-500 ease-out group-hover:translate-y-0 group-hover:opacity-100">

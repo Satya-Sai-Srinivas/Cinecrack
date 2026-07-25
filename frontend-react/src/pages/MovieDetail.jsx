@@ -4,6 +4,7 @@ import { useAuth } from '@clerk/clerk-react'
 import { ArrowLeft, Play, ExternalLink, Calendar, Tv, User } from 'lucide-react'
 import { fetchMovieDetail } from '../api'
 import { useRegionStore } from '../store/useAppStore'
+import MovieActions from '../components/movie/MovieActions'
 
 const PLACEHOLDER_POSTER = 'https://placehold.co/300x450/1e293b/94a3b8?text=No+Image'
 const PLACEHOLDER_PERSON = 'https://placehold.co/150x225/1e293b/94a3b8?text=No+Image'
@@ -155,6 +156,9 @@ export default function MovieDetail() {
               <Tv size={13} /> Not currently available to stream.
             </p>
           )}
+
+          {/* User actions: Watchlist / Watched / Like / Dislike */}
+          <MovieActions movieId={movie.id} />
 
           {/* Storyline */}
           {movie.storyline && (

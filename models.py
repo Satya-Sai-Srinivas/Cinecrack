@@ -92,6 +92,10 @@ class WatchlistRequest(BaseModel):
     movie_id: int
     status: str = Field(default="WATCHLIST", description="Must be 'WATCHLIST' or 'WATCHED'")
 
+class ReactionRequest(BaseModel):
+    movie_id: int
+    reaction: str = Field(..., description="Must be 'LIKE' or 'DISLIKE'")
+
 class WatchlistResponse(BaseModel):
     id: int
     user_id: str
