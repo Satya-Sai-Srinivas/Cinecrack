@@ -59,7 +59,10 @@ export function useMovieStatus() {
       if (ctx?.prev) qc.setQueryData(['watchlist'], ctx.prev)
       toast?.('Something went wrong. Please try again.', 'error')
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['watchlist'] }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['watchlist'] })
+      qc.invalidateQueries({ queryKey: ['recommendations'] })
+    },
   })
 
   // ---- Reactions (like / dislike / clear) ----
@@ -81,7 +84,10 @@ export function useMovieStatus() {
       if (ctx?.prev) qc.setQueryData(['reactions'], ctx.prev)
       toast?.('Something went wrong. Please try again.', 'error')
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['reactions'] }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['reactions'] })
+      qc.invalidateQueries({ queryKey: ['recommendations'] })
+    },
   })
 
   const requireAuth = () => {

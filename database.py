@@ -92,6 +92,19 @@ class UserSubscription(Base):
         UniqueConstraint("user_id", "provider_id", "region", name="uq_sub_user_provider_region"),
     )
 
+class RecommendationCache(Base):
+    __tablename__ = "recommendation_cache"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=False)
+    rec_date = Column(String, nullable=False)  # "YYYY-MM-DD:REGION"
+    data = Column(JSONB, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "rec_date", name="uq_rec_user_date"),
+    )
+
 class MovieEmbedding(Base):
     __tablename__ = "movie_embeddings"
     __table_args__ = (

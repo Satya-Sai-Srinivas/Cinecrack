@@ -122,6 +122,11 @@ export const removeSubscription = (token, providerId, region) =>
 export const fetchMovieProviders = (movieId, region, token) =>
   authFetch(`${BASE}/movies/${movieId}/providers?region=${encodeURIComponent(region)}`, { token })
 
+// ---------- Recommendations ----------
+
+export const fetchRecommendations = (token, region) =>
+  authFetch(`${BASE}/recommendations?region=${encodeURIComponent(region)}`, { token })
+
 // ---------- Location ----------
 
 export async function fetchLocation() {

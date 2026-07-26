@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, HttpUrl, Field
 from datetime import datetime, timedelta
 from auth import get_current_user, get_optional_user
-from database import Watchlist, User, ChatThread, Reaction, UserSubscription # Add the new tables
+from database import Watchlist, User, ChatThread, Reaction, UserSubscription, RecommendationCache # Add the new tables
 from models import WatchlistRequest, WatchlistResponse, ReactionRequest, SubscriptionRequest # Add the new models
 from fastapi import Request
 import httpx
@@ -26,6 +26,7 @@ from database import get_db, MovieCache, SearchHistory, init_db
 from contextlib import asynccontextmanager
 from ai_services import generate_embedding, similarity_search_movies, stream_cinematic_reply
 from embedding_service import ensure_movie_embedding
+from recommender import build_recommendations
 
 # --- Models Imports ---
 from models import MovieDetailResponse, ReleaseInfo, StreamingPlatform, CastMember, Technician, SocialMediaLinks, WorkReference, PersonDetailResponse, MovieCredit
@@ -356,6 +357,107 @@ async def hydrate_movie_previews(db: AsyncSession, movie_ids: List[int]) -> List
             )
         )
     return previews
+
+
+# --- Recommendation helpers ---
+REC_MIN_ACCESSIBLE = 8
+REC_MAX_PICKS = 20
+
+
+async def _fetch_flatrate_batch(movie_ids: List[int], region: str) -> Dict[int, set]:
+    """Concurrently fetch the set of flatrate provider ids for each movie in a region."""
+    if not movie_ids:
+        return {}
+
+    async def one(client: httpx.AsyncClient, movie_id: int):
+        try:
+            r = await client.get(
+                f"{BASE_URL}/movie/{movie_id}/watch/providers",
+                headers=HEADERS,
+                params=AUTH_PARAMS,
+            )
+            if r.status_code == 200:
+                data = ((r.json() or {}).get("results") or {}).get(region) or {}
+                return movie_id, {p["provider_id"] for p in data.get("flatrate", [])}
+        except httpx.HTTPError:
+            pass
+        return movie_id, set()
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        results = await asyncio.gather(
+            *[one(client, mid) for mid in movie_ids], return_exceptions=True
+        )
+    out: Dict[int, set] = {}
+    for res in results:
+        if isinstance(res, tuple):
+            out[res[0]] = res[1]
+    return out
+
+
+async def _rec_cards(
+    db: AsyncSession,
+    movie_ids: List[int],
+    reason_map: Optional[Dict[int, Optional[str]]] = None,
+    accessible_ids: Optional[set] = None,
+) -> List[Dict[str, Any]]:
+    previews = await hydrate_movie_previews(db, movie_ids)
+    reason_map = reason_map or {}
+    cards: List[Dict[str, Any]] = []
+    for p in previews:
+        card = p.model_dump(mode="json")
+        card["reason"] = reason_map.get(p.id)
+        card["available"] = (p.id in accessible_ids) if accessible_ids is not None else None
+        cards.append(card)
+    return cards
+
+
+async def _build_personalized(
+    db: AsyncSession, region: str, sub_ids: set, candidates: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    candidate_ids = [c["movie_id"] for c in candidates]
+    reason_map = {c["movie_id"]: c["reason"] for c in candidates}
+
+    accessible_ids: set = set()
+    if sub_ids and candidate_ids:
+        provider_sets = await _fetch_flatrate_batch(candidate_ids, region)
+        accessible_ids = {mid for mid, pids in provider_sets.items() if pids & sub_ids}
+
+    if sub_ids and len(accessible_ids) >= REC_MIN_ACCESSIBLE:
+        ordered = [mid for mid in candidate_ids if mid in accessible_ids]
+    else:
+        # Relax: accessible first, then the rest in similarity order.
+        ordered = [mid for mid in candidate_ids if mid in accessible_ids] + [
+            mid for mid in candidate_ids if mid not in accessible_ids
+        ]
+
+    cards = await _rec_cards(
+        db, ordered[:REC_MAX_PICKS], reason_map, accessible_ids if sub_ids else None
+    )
+    return {
+        "movie_of_the_day": cards[0] if cards else None,
+        "picks": cards[1:] if len(cards) > 1 else [],
+    }
+
+
+async def _build_cold_start(db: AsyncSession, region: str, sub_ids: set) -> Dict[str, Any]:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"{BASE_URL}/movie/popular", headers=HEADERS, params={"page": 1, **AUTH_PARAMS}
+        )
+    items = response.json().get("results", []) if response.status_code == 200 else []
+    ids = [it["id"] for it in items][:REC_MAX_PICKS]
+
+    if sub_ids and ids:
+        provider_sets = await _fetch_flatrate_batch(ids, region)
+        accessible = [mid for mid in ids if provider_sets.get(mid, set()) & sub_ids]
+        if len(accessible) >= REC_MIN_ACCESSIBLE:
+            ids = accessible
+
+    cards = await _rec_cards(db, ids[:REC_MAX_PICKS])
+    return {
+        "movie_of_the_day": cards[0] if cards else None,
+        "picks": cards[1:] if len(cards) > 1 else [],
+    }
 
 
 def _sse_event(payload: Dict[str, Any]) -> str:
@@ -1111,6 +1213,66 @@ async def remove_subscription(
         await db.delete(entry)
         await db.commit()
     return {"message": "Subscription removed"}
+
+# --- Personalized recommendations ---
+@app.get("/api/v1/recommendations")
+async def get_recommendations(
+    background_tasks: BackgroundTasks,
+    region: str = "US",
+    refresh: int = 0,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    region = (region or "US").upper()
+    cache_key = f"{datetime.utcnow().strftime('%Y-%m-%d')}:{region}"
+
+    if not refresh:
+        cached = await db.execute(
+            select(RecommendationCache).where(
+                RecommendationCache.user_id == user_id,
+                RecommendationCache.rec_date == cache_key,
+            )
+        )
+        row = cached.scalars().first()
+        if row:
+            return row.data
+
+    rec = await build_recommendations(db, user_id)
+
+    # Re-embed any signal movies that slipped through, so next time is richer.
+    for mid in rec.get("missing_ids", []):
+        background_tasks.add_task(ensure_movie_embedding, mid)
+
+    sub_result = await db.execute(
+        select(UserSubscription.provider_id).where(
+            UserSubscription.user_id == user_id,
+            UserSubscription.region == region,
+        )
+    )
+    sub_ids = set(sub_result.scalars().all())
+
+    if rec["cold_start"]:
+        # Not cached — flips to personalized as soon as the user rates enough movies.
+        payload = await _build_cold_start(db, region, sub_ids)
+        payload["cold_start"] = True
+        return payload
+
+    payload = await _build_personalized(db, region, sub_ids, rec["candidates"])
+    payload["cold_start"] = False
+
+    existing = await db.execute(
+        select(RecommendationCache).where(
+            RecommendationCache.user_id == user_id,
+            RecommendationCache.rec_date == cache_key,
+        )
+    )
+    ex = existing.scalars().first()
+    if ex:
+        ex.data = payload
+    else:
+        db.add(RecommendationCache(user_id=user_id, rec_date=cache_key, data=payload))
+    await db.commit()
+    return payload
 
 @app.get("/api/v1/history")
 async def get_search_history(
