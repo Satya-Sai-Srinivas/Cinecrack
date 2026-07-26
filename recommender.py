@@ -54,6 +54,59 @@ async def _gather_signals(db: AsyncSession, user_id: str):
     return weights, labels
 
 
+async def compute_taste_vector(db: AsyncSession, user_id: str):
+    """Returns (normalized taste vector as list[float] | None, seen_ids set)."""
+    weights, _labels = await _gather_signals(db, user_id)
+    seen_ids = set(weights.keys())
+    positive = [mid for mid, w in weights.items() if w > 0]
+    if len(positive) < COLD_START_MIN_POSITIVE:
+        return None, seen_ids
+
+    rows = (
+        await db.execute(
+            select(MovieEmbedding.movie_id, MovieEmbedding.embedding).where(
+                MovieEmbedding.movie_id.in_(list(weights.keys()))
+            )
+        )
+    ).all()
+    if not rows:
+        return None, seen_ids
+
+    dim = np.asarray(rows[0][1], dtype=np.float32).shape[0]
+    taste = np.zeros(dim, dtype=np.float32)
+    for mid, emb in rows:
+        taste += weights[mid] * np.asarray(emb, dtype=np.float32)
+    norm = float(np.linalg.norm(taste))
+    if norm == 0.0:
+        return None, seen_ids
+    return (taste / norm).tolist(), seen_ids
+
+
+async def blend_recommendations(db: AsyncSession, user_a: str, user_b: str, k: int = 40) -> Dict[str, Any]:
+    """Midpoint of two users' taste vectors → shared nearest-neighbour picks."""
+    ta, seen_a = await compute_taste_vector(db, user_a)
+    tb, seen_b = await compute_taste_vector(db, user_b)
+    if ta is None or tb is None:
+        return {"cold_start": True, "movie_ids": []}
+
+    midpoint = np.asarray(ta, dtype=np.float32) + np.asarray(tb, dtype=np.float32)
+    norm = float(np.linalg.norm(midpoint))
+    if norm == 0.0:
+        return {"cold_start": True, "movie_ids": []}
+    midpoint = (midpoint / norm).tolist()
+
+    exclude = seen_a | seen_b
+    rows = (
+        await db.execute(
+            select(MovieEmbedding.movie_id)
+            .where(MovieEmbedding.movie_id.notin_(list(exclude)))
+            .order_by(MovieEmbedding.embedding.l2_distance(midpoint))
+            .limit(k)
+        )
+    ).all()
+    return {"cold_start": False, "movie_ids": [r[0] for r in rows]}
+
+
 async def build_recommendations(db: AsyncSession, user_id: str) -> Dict[str, Any]:
     weights, labels = await _gather_signals(db, user_id)
     seen_ids = set(weights.keys())

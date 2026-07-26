@@ -3,6 +3,7 @@ import { Tv, Search } from 'lucide-react'
 import { useAuth } from '@clerk/clerk-react'
 import { useRegionStore } from '../store/useAppStore'
 import ProviderToggles from '../components/movie/ProviderToggles'
+import ShareTaste from '../components/profile/ShareTaste'
 import { EmptyState } from '../components/ui/EmptyState'
 
 export default function Settings() {
@@ -47,6 +48,8 @@ export default function Settings() {
       <p className="text-[11px] text-[var(--text-muted)] mt-8">
         Streaming availability data provided by JustWatch.
       </p>
+
+      <ShareTaste />
     </div>
   )
 }
