@@ -281,4 +281,4 @@ Interactive docs are available at `/docs` when the backend is running.
 - Streaming availability data is provided by **[JustWatch](https://www.justwatch.com/)** (via TMDB).
 - Plot summaries are sourced from **Wikipedia**.
 
-Built as a personal project. No license is currently specified — please contact the author before reuse.
+Released under the [MIT License](LICENSE).
