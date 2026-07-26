@@ -5,6 +5,7 @@ import { fetchNowPlaying, fetchSearchMovies, fetchCountries, fetchLanguages } fr
 import { useRegionStore } from '../store/useAppStore'
 import { useIntersectionObserver } from '../hooks/useInfiniteScroll'
 import MovieCard from '../components/movie/MovieCard'
+import Recommendations from '../components/movie/Recommendations'
 import { SkeletonGrid } from '../components/ui/SkeletonCard'
 import { EmptyState } from '../components/ui/EmptyState'
 
@@ -124,6 +125,9 @@ export default function Home() {
             Search
           </button>
         </section>
+
+        {/* Personalized recommendations (signed-in only) */}
+        {!isSearchMode && <Recommendations />}
 
         {/* Filters: Country + Language */}
         {!isSearchMode && (
