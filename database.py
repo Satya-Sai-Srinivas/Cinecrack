@@ -125,6 +125,15 @@ class Notification(Base):
     is_read = Column(Integer, default=0)  # 0 = unread, 1 = read
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class UserProfile(Base):
+    __tablename__ = "user_profile"
+
+    user_id = Column(String, primary_key=True, index=True)
+    share_slug = Column(String, unique=True, index=True, nullable=True)
+    display_name = Column(String, nullable=True)
+    taste_summary = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
 class AvailabilitySnapshot(Base):
     __tablename__ = "availability_snapshot"
 

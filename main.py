@@ -2,6 +2,7 @@ import asyncio
 import httpx
 import os
 import json
+import secrets
 import urllib.parse
 import re
 from fastapi import FastAPI, HTTPException, Depends, Query, BackgroundTasks, Header
@@ -15,8 +16,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, HttpUrl, Field
 from datetime import datetime, timedelta
 from auth import get_current_user, get_optional_user
-from database import Watchlist, User, ChatThread, Reaction, UserSubscription, RecommendationCache, Notification, AvailabilitySnapshot # Add the new tables
-from models import WatchlistRequest, WatchlistResponse, ReactionRequest, SubscriptionRequest, AskRequest # Add the new models
+from database import Watchlist, User, ChatThread, Reaction, UserSubscription, RecommendationCache, Notification, AvailabilitySnapshot, UserProfile # Add the new tables
+from models import WatchlistRequest, WatchlistResponse, ReactionRequest, SubscriptionRequest, AskRequest, ShareRequest # Add the new models
 from fastapi import Request
 import httpx
 
@@ -26,9 +27,9 @@ from sqlalchemy.future import select
 from sqlalchemy import delete, update
 from database import get_db, MovieCache, SearchHistory, init_db, MovieEmbedding, ChatMessage, AsyncSessionLocal
 from contextlib import asynccontextmanager
-from ai_services import generate_embedding, similarity_search_movies, stream_cinematic_reply, generate_why, answer_movie_question
+from ai_services import generate_embedding, similarity_search_movies, stream_cinematic_reply, generate_why, answer_movie_question, generate_taste_summary
 from embedding_service import ensure_movie_embedding
-from recommender import build_recommendations
+from recommender import build_recommendations, blend_recommendations
 
 # --- Models Imports ---
 from models import MovieDetailResponse, ReleaseInfo, StreamingPlatform, CastMember, Technician, SocialMediaLinks, WorkReference, PersonDetailResponse, MovieCredit
@@ -1453,6 +1454,129 @@ async def get_recommendations(
         db.add(RecommendationCache(user_id=user_id, rec_date=cache_key, data=payload))
     await db.commit()
     return payload
+
+# --- Shareable taste profile + "what should we watch" blend ---
+async def _build_taste_profile_data(db: AsyncSession, user_id: str) -> Dict[str, Any]:
+    likes = list(
+        (await db.execute(
+            select(Reaction.movie_id).where(Reaction.user_id == user_id, Reaction.reaction == "LIKE")
+        )).scalars().all()
+    )
+    watched = list(
+        (await db.execute(
+            select(Watchlist.movie_id).where(Watchlist.user_id == user_id, Watchlist.status == "WATCHED")
+        )).scalars().all()
+    )
+
+    signal_ids = list(dict.fromkeys(likes + watched))
+    genre_counts: Dict[str, int] = {}
+    title_by_id: Dict[int, str] = {}
+    if signal_ids:
+        cache = (
+            await db.execute(select(MovieCache).where(MovieCache.movie_id.in_(signal_ids)))
+        ).scalars().all()
+        for entry in cache:
+            data = entry.movie_data or {}
+            for g in data.get("genres", []):
+                genre_counts[g] = genre_counts.get(g, 0) + 1
+            t = data.get("title")
+            if t:
+                title_by_id[entry.movie_id] = t
+
+    top_genres = [g for g, _ in sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:6]]
+    favorites = await hydrate_movie_previews(db, likes[:12])
+    return {
+        "top_genres": top_genres,
+        "liked_titles": [title_by_id[m] for m in likes if m in title_by_id],
+        "watched_titles": [title_by_id[m] for m in watched if m in title_by_id],
+        "favorites": [f.model_dump(mode="json") for f in favorites],
+        "stats": {"liked": len(likes), "watched": len(watched)},
+    }
+
+
+@app.get("/api/v1/user/profile/share")
+async def get_share(db: AsyncSession = Depends(get_db), user_id: str = Depends(get_current_user)):
+    p = (await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))).scalars().first()
+    return {
+        "slug": p.share_slug if p else None,
+        "display_name": p.display_name if p else None,
+    }
+
+
+@app.post("/api/v1/user/profile/share")
+async def create_share(
+    payload: ShareRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    await ensure_user(db, user_id)
+    p = (await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))).scalars().first()
+    if p is None:
+        p = UserProfile(user_id=user_id)
+        db.add(p)
+
+    if not p.share_slug:
+        p.share_slug = secrets.token_urlsafe(8)
+    if payload.display_name is not None:
+        p.display_name = (payload.display_name.strip()[:60]) or None
+
+    data = await _build_taste_profile_data(db, user_id)
+    summary = await generate_taste_summary(data["liked_titles"], data["watched_titles"], data["top_genres"])
+    if summary:
+        p.taste_summary = summary
+    p.updated_at = datetime.utcnow()
+
+    await db.commit()
+    return {"slug": p.share_slug, "display_name": p.display_name}
+
+
+@app.delete("/api/v1/user/profile/share")
+async def delete_share(db: AsyncSession = Depends(get_db), user_id: str = Depends(get_current_user)):
+    p = (await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))).scalars().first()
+    if p:
+        p.share_slug = None
+        await db.commit()
+    return {"message": "Sharing disabled"}
+
+
+@app.get("/api/v1/profile/{slug}")
+async def get_public_profile(slug: str, db: AsyncSession = Depends(get_db)):
+    p = (await db.execute(select(UserProfile).where(UserProfile.share_slug == slug))).scalars().first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    data = await _build_taste_profile_data(db, p.user_id)
+    return {
+        "display_name": p.display_name or "A Cinecrack cinephile",
+        "taste_summary": p.taste_summary,
+        "top_genres": data["top_genres"],
+        "favorites": data["favorites"],
+        "stats": data["stats"],
+    }
+
+
+@app.get("/api/v1/recommendations/blend")
+async def get_blend(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    other = (await db.execute(select(UserProfile).where(UserProfile.share_slug == slug))).scalars().first()
+    if not other:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    if other.user_id == user_id:
+        raise HTTPException(status_code=400, detail="That's your own profile")
+
+    result = await blend_recommendations(db, user_id, other.user_id)
+    with_name = other.display_name or "your friend"
+    if result["cold_start"]:
+        return {"cold_start": True, "with_name": with_name, "picks": []}
+
+    cards = await hydrate_movie_previews(db, result["movie_ids"][:20])
+    return {
+        "cold_start": False,
+        "with_name": with_name,
+        "picks": [c.model_dump(mode="json") for c in cards],
+    }
 
 # --- Notifications & "now streaming" availability checks ---
 @app.get("/api/v1/user/notifications")

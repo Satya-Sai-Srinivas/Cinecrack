@@ -150,6 +150,27 @@ export const fetchNotifications = (token) =>
 export const markNotificationsRead = (token) =>
   authFetch(`${BASE}/user/notifications/read`, { token, method: 'POST' })
 
+// ---------- Shareable taste profile + blend ----------
+
+export const fetchShareLink = (token) =>
+  authFetch(`${BASE}/user/profile/share`, { token })
+
+export const createShareLink = (token, displayName) =>
+  authFetch(`${BASE}/user/profile/share`, {
+    token,
+    method: 'POST',
+    body: { display_name: displayName },
+  })
+
+export const deleteShareLink = (token) =>
+  authFetch(`${BASE}/user/profile/share`, { token, method: 'DELETE' })
+
+export const fetchPublicProfile = (slug) =>
+  get(`${BASE}/profile/${slug}`)
+
+export const fetchBlend = (token, slug) =>
+  authFetch(`${BASE}/recommendations/blend?slug=${encodeURIComponent(slug)}`, { token })
+
 // ---------- Location ----------
 
 export async function fetchLocation() {

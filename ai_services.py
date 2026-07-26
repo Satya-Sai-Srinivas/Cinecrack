@@ -37,6 +37,35 @@ async def generate_why(title: str, storyline: str, anchor_titles: List[str]) -> 
         return None
 
 
+async def generate_taste_summary(
+    liked: List[str], watched: List[str], genres: List[str]
+) -> Optional[str]:
+    """A short, witty 2-3 sentence summary of a user's taste for a shareable profile."""
+    parts = []
+    if liked:
+        parts.append("Liked: " + ", ".join(liked[:10]))
+    if watched:
+        parts.append("Watched: " + ", ".join(watched[:10]))
+    if genres:
+        parts.append("Top genres: " + ", ".join(genres))
+    if not parts:
+        return None
+
+    system = (
+        "You are a witty film critic writing a fun, specific 2-3 sentence summary of "
+        "someone's movie taste for a shareable profile. Reference patterns (tone, pacing, "
+        "themes, genre). Write in second person ('You gravitate toward…'). No spoilers, no "
+        "generic filler like 'must-watch' or 'rollercoaster'."
+    )
+    human = "Their activity:\n" + "\n".join(parts) + "\n\nWrite their taste summary."
+    try:
+        response = await _utility_client.ainvoke([("system", system), ("human", human)])
+        text = (response.content if isinstance(response.content, str) else "").strip()
+        return text or None
+    except Exception:
+        return None
+
+
 async def answer_movie_question(
     title: str, plot: str, question: str, reveal_spoilers: bool
 ) -> str:

@@ -13,6 +13,7 @@ import PersonProfile from './pages/PersonProfile'
 import History from './pages/History'
 import Watchlist from './pages/Watchlist'
 import Settings from './pages/Settings'
+import PublicProfile from './pages/PublicProfile'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,6 +43,8 @@ export default function App() {
         <ToastProvider>
           <ThemeInitializer />
           <Routes>
+            {/* Public shareable profile — standalone, no app chrome */}
+            <Route path="/u/:slug" element={<PublicProfile />} />
             <Route element={<AppLayout />}>
               <Route index element={<Home />} />
               <Route path="discover" element={<Discover />} />
