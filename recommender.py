@@ -60,7 +60,13 @@ async def build_recommendations(db: AsyncSession, user_id: str) -> Dict[str, Any
     positive_ids = [mid for mid, w in weights.items() if w > 0]
 
     if len(positive_ids) < COLD_START_MIN_POSITIVE:
-        return {"cold_start": True, "candidates": [], "seen_ids": list(seen_ids), "missing_ids": []}
+        return {
+            "cold_start": True,
+            "candidates": [],
+            "seen_ids": list(seen_ids),
+            "missing_ids": [],
+            "anchor_titles": [],
+        }
 
     rows = (
         await db.execute(
@@ -75,7 +81,18 @@ async def build_recommendations(db: AsyncSession, user_id: str) -> Dict[str, Any
         (mid, title, np.asarray(emb, dtype=np.float32), weights[mid]) for mid, title, emb in rows
     ]
     if not signal_vecs:
-        return {"cold_start": True, "candidates": [], "seen_ids": list(seen_ids), "missing_ids": missing_ids}
+        return {
+            "cold_start": True,
+            "candidates": [],
+            "seen_ids": list(seen_ids),
+            "missing_ids": missing_ids,
+            "anchor_titles": [],
+        }
+
+    # Top positive-signal titles (by weight) — context for the grounded "why".
+    anchor_titles = [
+        title for _mid, title, _v, _w in sorted(signal_vecs, key=lambda s: s[3], reverse=True) if _w > 0
+    ][:5]
 
     # Weighted centroid, normalised.
     dim = signal_vecs[0][2].shape[0]
@@ -84,7 +101,13 @@ async def build_recommendations(db: AsyncSession, user_id: str) -> Dict[str, Any
         taste += weight * vec
     norm = float(np.linalg.norm(taste))
     if norm == 0.0:
-        return {"cold_start": True, "candidates": [], "seen_ids": list(seen_ids), "missing_ids": missing_ids}
+        return {
+            "cold_start": True,
+            "candidates": [],
+            "seen_ids": list(seen_ids),
+            "missing_ids": missing_ids,
+            "anchor_titles": anchor_titles,
+        }
     taste = taste / norm
 
     anchors = [(mid, vec) for (mid, _t, vec, weight) in signal_vecs if weight > 0]
@@ -114,4 +137,5 @@ async def build_recommendations(db: AsyncSession, user_id: str) -> Dict[str, Any
         "candidates": candidates,
         "seen_ids": list(seen_ids),
         "missing_ids": missing_ids,
+        "anchor_titles": anchor_titles,
     }

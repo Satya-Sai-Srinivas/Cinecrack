@@ -65,6 +65,15 @@ class ChatThread(Base):
     title = Column(String, default="New Conversation")
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=False)
+    role = Column(String, nullable=False)  # "user" or "assistant"
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class Reaction(Base):
     __tablename__ = "reactions"
 

@@ -1,11 +1,13 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '@clerk/clerk-react'
 import {
   MessageCircle, X, Trash2, Send, Bot, Film,
 } from 'lucide-react'
 import { useChatStore } from '../../store/useAppStore'
 import { useAIChat } from '../../hooks/useAIChat'
 import { useToast } from '../ui/Toast'
+import { fetchChatMessages, clearChatMessages } from '../../api'
 
 const PLACEHOLDER_POSTER = 'https://placehold.co/300x450/1e293b/94a3b8?text=No+Image'
 
@@ -90,13 +92,29 @@ function MessageBubble({ msg }) {
 
 // ---- Main ChatbotWidget ----
 export function ChatbotWidget() {
-  const { isOpen, history, toggleOpen, clearHistory } = useChatStore()
+  const { isOpen, history, toggleOpen, clearHistory, setHistory } = useChatStore()
   const { sendMessage, isStreaming } = useAIChat()
+  const { getToken, isSignedIn } = useAuth()
   const toast = useToast()
 
   const [input, setInput] = useState('')
   const threadRef = useRef(null)
   const textareaRef = useRef(null)
+  const hydratedRef = useRef(false)
+
+  // Hydrate the persisted conversation once for signed-in users.
+  useEffect(() => {
+    if (!isSignedIn || hydratedRef.current) return
+    hydratedRef.current = true
+    ;(async () => {
+      try {
+        const msgs = await fetchChatMessages(await getToken())
+        if (msgs?.length) setHistory(msgs)
+      } catch {
+        /* ignore */
+      }
+    })()
+  }, [isSignedIn, getToken, setHistory])
 
   // Auto-scroll thread to bottom when messages update
   useEffect(() => {
@@ -137,10 +155,17 @@ export function ChatbotWidget() {
     [handleSubmit]
   )
 
-  const handleClear = useCallback(() => {
+  const handleClear = useCallback(async () => {
     clearHistory()
     toast?.('Chat history cleared.', 'success')
-  }, [clearHistory, toast])
+    if (isSignedIn) {
+      try {
+        await clearChatMessages(await getToken())
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [clearHistory, toast, isSignedIn, getToken])
 
   // Show welcome message when history is empty
   const displayMessages =

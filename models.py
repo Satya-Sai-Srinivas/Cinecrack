@@ -101,6 +101,10 @@ class SubscriptionRequest(BaseModel):
     provider_name: Optional[str] = None
     region: str
 
+class AskRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=500)
+    reveal_spoilers: bool = False
+
 class WatchlistResponse(BaseModel):
     id: int
     user_id: str

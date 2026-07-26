@@ -127,6 +127,21 @@ export const fetchMovieProviders = (movieId, region, token) =>
 export const fetchRecommendations = (token, region) =>
   authFetch(`${BASE}/recommendations?region=${encodeURIComponent(region)}`, { token })
 
+// ---------- Persistent chat + movie Q&A ----------
+
+export const fetchChatMessages = (token) =>
+  authFetch(`${BASE}/user/chat/messages`, { token })
+
+export const clearChatMessages = (token) =>
+  authFetch(`${BASE}/user/chat/messages`, { token, method: 'DELETE' })
+
+export const askMovie = (movieId, question, revealSpoilers, token) =>
+  authFetch(`${BASE}/movies/${movieId}/ask`, {
+    token,
+    method: 'POST',
+    body: { question, reveal_spoilers: revealSpoilers },
+  })
+
 // ---------- Location ----------
 
 export async function fetchLocation() {

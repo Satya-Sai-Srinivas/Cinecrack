@@ -96,8 +96,8 @@ function MovieOfTheDay({ card, coldStart }) {
             {card.title}
           </h3>
           {year && <p className="text-sm text-[var(--text-muted)] font-semibold">{year}</p>}
-          {card.reason && (
-            <p className="text-sm text-[var(--accent)] font-medium">{card.reason}</p>
+          {(card.why || card.reason) && (
+            <p className="text-sm text-[var(--accent)] font-medium">{card.why || card.reason}</p>
           )}
           {card.available === false && (
             <p className="text-xs text-[var(--text-muted)] italic">Not on your services</p>

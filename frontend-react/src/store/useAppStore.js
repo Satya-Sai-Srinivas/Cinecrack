@@ -45,6 +45,7 @@ export const useChatStore = create((set) => ({
   open: () => set({ isOpen: true }),
   close: () => set({ isOpen: false }),
   addMessage: (msg) => set((s) => ({ history: [...s.history, msg] })),
+  setHistory: (history) => set({ history }),
   updateLastAssistant: (content, recommendations) =>
     set((s) => {
       const history = [...s.history]
