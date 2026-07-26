@@ -6,6 +6,7 @@ import { fetchMovieDetail } from '../api'
 import { useRegionStore } from '../store/useAppStore'
 import MovieActions from '../components/movie/MovieActions'
 import WhereToWatch from '../components/movie/WhereToWatch'
+import AskAboutMovie from '../components/movie/AskAboutMovie'
 
 const PLACEHOLDER_POSTER = 'https://placehold.co/300x450/1e293b/94a3b8?text=No+Image'
 const PLACEHOLDER_PERSON = 'https://placehold.co/150x225/1e293b/94a3b8?text=No+Image'
@@ -181,6 +182,9 @@ export default function MovieDetail() {
           </div>
         </Section>
       )}
+
+      {/* Spoiler-safe plot Q&A */}
+      <AskAboutMovie movieId={movie.id} />
     </div>
   )
 }

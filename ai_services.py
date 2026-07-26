@@ -15,6 +15,51 @@ CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
 
 _embedding_client = OpenAIEmbeddings(model=EMBEDDING_MODEL)
 _chat_client = ChatOpenAI(model=CHAT_MODEL, temperature=0.1)
+# Separate low-temp client for short, grounded one-off generations.
+_utility_client = ChatOpenAI(model=CHAT_MODEL, temperature=0.3)
+
+
+async def generate_why(title: str, storyline: str, anchor_titles: List[str]) -> Optional[str]:
+    """One concise, plot-grounded sentence on why this fits the user's taste."""
+    liked = ", ".join(anchor_titles[:5]) if anchor_titles else "movies they enjoy"
+    system = (
+        "You are a sharp movie critic. In ONE concise sentence (max 30 words), explain why "
+        "someone who liked the given movies would enjoy this film. Ground it ONLY in the "
+        "provided plot. No spoilers. No fluff or generic phrases like 'a must-watch', "
+        "'rollercoaster', or 'rich tapestry'. Speak like a real human."
+    )
+    human = f"Movies they liked: {liked}\n\nFilm: {title}\nPlot: {storyline}\n\nWhy would they like it?"
+    try:
+        response = await _utility_client.ainvoke([("system", system), ("human", human)])
+        text = (response.content if isinstance(response.content, str) else "").strip()
+        return text or None
+    except Exception:
+        return None
+
+
+async def answer_movie_question(
+    title: str, plot: str, question: str, reveal_spoilers: bool
+) -> str:
+    """Answer a question about a movie, grounded in its plot, with a spoiler guard."""
+    if reveal_spoilers:
+        spoiler_rule = "You MAY reveal spoilers, including the ending and any twists."
+    else:
+        spoiler_rule = (
+            "Do NOT reveal spoilers — no endings, deaths, or twists. If the honest answer "
+            "would require a spoiler, say so and suggest enabling spoilers, rather than revealing it."
+        )
+    system = (
+        f"You answer questions about the movie '{title}' using ONLY the provided plot. "
+        f"Be concise and direct. {spoiler_rule} If the plot doesn't contain the answer, "
+        "say you don't have that detail."
+    )
+    human = f"Plot:\n{plot}\n\nQuestion: {question}"
+    try:
+        response = await _utility_client.ainvoke([("system", system), ("human", human)])
+        text = (response.content if isinstance(response.content, str) else "").strip()
+        return text or "Sorry, I couldn't find an answer to that."
+    except Exception:
+        return "Sorry, I couldn't answer that right now."
 
 
 @tool("apply_discover_filters")

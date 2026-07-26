@@ -15,16 +15,17 @@ from pydantic import BaseModel, HttpUrl, Field
 from datetime import datetime, timedelta
 from auth import get_current_user, get_optional_user
 from database import Watchlist, User, ChatThread, Reaction, UserSubscription, RecommendationCache # Add the new tables
-from models import WatchlistRequest, WatchlistResponse, ReactionRequest, SubscriptionRequest # Add the new models
+from models import WatchlistRequest, WatchlistResponse, ReactionRequest, SubscriptionRequest, AskRequest # Add the new models
 from fastapi import Request
 import httpx
 
 # --- Database Imports ---
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from database import get_db, MovieCache, SearchHistory, init_db
+from sqlalchemy import delete
+from database import get_db, MovieCache, SearchHistory, init_db, MovieEmbedding, ChatMessage, AsyncSessionLocal
 from contextlib import asynccontextmanager
-from ai_services import generate_embedding, similarity_search_movies, stream_cinematic_reply
+from ai_services import generate_embedding, similarity_search_movies, stream_cinematic_reply, generate_why, answer_movie_question
 from embedding_service import ensure_movie_embedding
 from recommender import build_recommendations
 
@@ -412,7 +413,11 @@ async def _rec_cards(
 
 
 async def _build_personalized(
-    db: AsyncSession, region: str, sub_ids: set, candidates: List[Dict[str, Any]]
+    db: AsyncSession,
+    region: str,
+    sub_ids: set,
+    candidates: List[Dict[str, Any]],
+    anchor_titles: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     candidate_ids = [c["movie_id"] for c in candidates]
     reason_map = {c["movie_id"]: c["reason"] for c in candidates}
@@ -433,6 +438,20 @@ async def _build_personalized(
     cards = await _rec_cards(
         db, ordered[:REC_MAX_PICKS], reason_map, accessible_ids if sub_ids else None
     )
+
+    # Grounded LLM "why this fits you" for the Movie of the Day only (cached daily).
+    if cards:
+        motd = cards[0]
+        storyline = (
+            await db.execute(
+                select(MovieEmbedding.storyline).where(MovieEmbedding.movie_id == motd["id"])
+            )
+        ).scalar_one_or_none()
+        if storyline:
+            why = await generate_why(motd["title"], storyline, anchor_titles or [])
+            if why:
+                motd["why"] = why
+
     return {
         "movie_of_the_day": cards[0] if cards else None,
         "picks": cards[1:] if len(cards) > 1 else [],
@@ -673,7 +692,30 @@ async def ai_chat(
                 if (entry.movie_data or {}).get("title")
             ]
 
+        # Liked / disliked (reactions), resolved to titles via the movie cache.
+        reaction_result = await db.execute(
+            select(Reaction.movie_id, Reaction.reaction).where(Reaction.user_id == user_id)
+        )
+        liked_ids, disliked_ids = [], []
+        for mid, reaction in reaction_result.all():
+            (liked_ids if reaction == "LIKE" else disliked_ids).append(mid)
+        react_title_by_id: Dict[int, str] = {}
+        if liked_ids or disliked_ids:
+            rc = await db.execute(
+                select(MovieCache).where(MovieCache.movie_id.in_(liked_ids + disliked_ids))
+            )
+            for entry in rc.scalars().all():
+                t = (entry.movie_data or {}).get("title")
+                if t:
+                    react_title_by_id[entry.movie_id] = t
+        liked_titles = [react_title_by_id[m] for m in liked_ids if m in react_title_by_id]
+        disliked_titles = [react_title_by_id[m] for m in disliked_ids if m in react_title_by_id]
+
         history_parts: List[str] = []
+        if liked_titles:
+            history_parts.append("Liked: " + ", ".join(liked_titles))
+        if disliked_titles:
+            history_parts.append("Disliked: " + ", ".join(disliked_titles))
         if viewed_titles:
             history_parts.append("Recently viewed: " + ", ".join(viewed_titles))
         if saved_titles:
@@ -686,13 +728,31 @@ async def ai_chat(
     else:
         user_history_str = "The user is browsing anonymously (no personal history available)."
 
+    # Persistent memory: for signed-in users the server is the source of truth for
+    # conversation history. Load prior turns, then persist this user message.
+    persist_reply = False
+    if user_id:
+        prior = await db.execute(
+            select(ChatMessage)
+            .where(ChatMessage.user_id == user_id)
+            .order_by(ChatMessage.created_at.desc())
+            .limit(20)
+        )
+        prior_msgs = list(reversed(prior.scalars().all()))
+        history_payload = [{"role": m.role, "content": m.content} for m in prior_msgs]
+        db.add(ChatMessage(user_id=user_id, role="user", content=payload.query))
+        await db.commit()
+        persist_reply = True
+
     async def event_generator():
+        assistant_text = ""
         try:
             if not retrieved_movies:
                 fallback = (
                     "I could not find enough cinematic memory yet. Seed embeddings first, then ask again "
                     "and I will craft a richer recommendation."
                 )
+                assistant_text = fallback
                 yield _sse_event({"type": "text", "content": fallback})
             else:
                 async for stream_chunk in stream_cinematic_reply(
@@ -701,6 +761,8 @@ async def ai_chat(
                     retrieved_movies=retrieved_movies,
                     user_history=user_history_str
                 ):
+                    if stream_chunk.get("type") == "text":
+                        assistant_text += stream_chunk.get("content", "")
                     yield _sse_event(stream_chunk)
 
             yield _sse_event(
@@ -712,8 +774,42 @@ async def ai_chat(
             yield _sse_event({"type": "done"})
         except Exception as exc:
             yield _sse_event({"type": "error", "message": f"Streaming failed: {exc}"})
+        finally:
+            # Persist the assistant reply with a fresh session (the request session
+            # may already be closed by the time streaming finishes).
+            if persist_reply and assistant_text.strip():
+                try:
+                    async with AsyncSessionLocal() as session:
+                        session.add(
+                            ChatMessage(user_id=user_id, role="assistant", content=assistant_text.strip())
+                        )
+                        await session.commit()
+                except Exception:
+                    pass
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+# --- Persistent chat history (single conversation per user) ---
+@app.get("/api/v1/user/chat/messages")
+async def get_chat_messages(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    result = await db.execute(
+        select(ChatMessage)
+        .where(ChatMessage.user_id == user_id)
+        .order_by(ChatMessage.created_at.asc())
+    )
+    return [{"role": m.role, "content": m.content} for m in result.scalars().all()]
+
+@app.delete("/api/v1/user/chat/messages")
+async def clear_chat_messages(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    await db.execute(delete(ChatMessage).where(ChatMessage.user_id == user_id))
+    await db.commit()
+    return {"message": "Chat cleared"}
 
 # --- Config endpoints (country / language pickers) ---
 _config_cache: Dict[str, List[Dict[str, str]]] = {}
@@ -975,6 +1071,54 @@ async def get_movie_providers(
         "rent": fmt(region_data.get("rent", [])),
         "buy": fmt(region_data.get("buy", [])),
     }
+
+async def _gather_movie_plot(db: AsyncSession, movie_id: int):
+    """Best-effort (title, plot) for a movie: stored storyline, TMDB overview,
+    and a live Wikipedia plot when available (for richer spoiler-aware answers)."""
+    title = None
+    plot = None
+    row = (
+        await db.execute(
+            select(MovieEmbedding.title, MovieEmbedding.storyline).where(
+                MovieEmbedding.movie_id == movie_id
+            )
+        )
+    ).first()
+    if row:
+        title, plot = row[0], row[1]
+
+    release_date = ""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.get(
+            f"{BASE_URL}/movie/{movie_id}", headers=HEADERS, params=AUTH_PARAMS
+        )
+        if response.status_code == 200:
+            data = response.json()
+            title = title or data.get("title")
+            release_date = data.get("release_date", "") or ""
+            if not plot:
+                plot = data.get("overview")
+        try:
+            from seed_embeddings import fetch_wikipedia_plot
+
+            wiki = await fetch_wikipedia_plot(client, title or "", release_date)
+            if wiki:
+                plot = wiki
+        except Exception:
+            pass
+
+    return title or "this movie", plot or "No plot information available."
+
+
+@app.post("/api/v1/movies/{movie_id}/ask")
+async def ask_about_movie(
+    movie_id: int,
+    payload: AskRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    title, plot = await _gather_movie_plot(db, movie_id)
+    answer = await answer_movie_question(title, plot, payload.question, payload.reveal_spoilers)
+    return {"answer": answer}
 
 @app.get("/api/v1/person/{person_id}", response_model=PersonDetailResponse)
 async def get_person_details(person_id: int):
@@ -1257,7 +1401,9 @@ async def get_recommendations(
         payload["cold_start"] = True
         return payload
 
-    payload = await _build_personalized(db, region, sub_ids, rec["candidates"])
+    payload = await _build_personalized(
+        db, region, sub_ids, rec["candidates"], rec.get("anchor_titles")
+    )
     payload["cold_start"] = False
 
     existing = await db.execute(
