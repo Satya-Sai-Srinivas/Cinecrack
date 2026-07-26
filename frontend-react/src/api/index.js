@@ -142,6 +142,14 @@ export const askMovie = (movieId, question, revealSpoilers, token) =>
     body: { question, reveal_spoilers: revealSpoilers },
   })
 
+// ---------- Notifications ----------
+
+export const fetchNotifications = (token) =>
+  authFetch(`${BASE}/user/notifications`, { token })
+
+export const markNotificationsRead = (token) =>
+  authFetch(`${BASE}/user/notifications/read`, { token, method: 'POST' })
+
 // ---------- Location ----------
 
 export async function fetchLocation() {

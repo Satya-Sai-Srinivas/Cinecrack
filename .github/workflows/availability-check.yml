@@ -1,0 +1,19 @@
+name: Now-Streaming Availability Check
+
+# Runs daily and lets you trigger it manually from the Actions tab.
+on:
+  schedule:
+    - cron: '0 9 * * *' # 09:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger availability check
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsS -X POST "$BACKEND_URL/api/v1/internal/check-availability" \
+            -H "X-Cron-Secret: $CRON_SECRET"

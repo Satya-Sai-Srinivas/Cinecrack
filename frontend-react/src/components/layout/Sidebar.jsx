@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { Film, Compass, Clock, Bookmark, Tv, Moon, Sun } from 'lucide-react';
 import { useThemeStore } from '../../store/useAppStore'; 
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react"
+import NotificationBell from './NotificationBell'
 
 export default function Sidebar() {
   const theme = useThemeStore((s) => s.theme)
@@ -37,6 +38,10 @@ export default function Sidebar() {
         <h1 className="text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[var(--text-main)] to-[var(--accent)]">
           Cinecrack
         </h1>
+
+        <div className="ml-auto">
+          <NotificationBell align="left" />
+        </div>
       </div>
 
       {/* Navigation */}
