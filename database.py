@@ -114,6 +114,30 @@ class RecommendationCache(Base):
         UniqueConstraint("user_id", "rec_date", name="uq_rec_user_date"),
     )
 
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=False)
+    title = Column(String, nullable=False)
+    body = Column(String, nullable=False)
+    movie_id = Column(Integer, nullable=True)
+    is_read = Column(Integer, default=0)  # 0 = unread, 1 = read
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class AvailabilitySnapshot(Base):
+    __tablename__ = "availability_snapshot"
+
+    id = Column(Integer, primary_key=True, index=True)
+    movie_id = Column(Integer, index=True, nullable=False)
+    region = Column(String, nullable=False)
+    provider_ids = Column(JSONB, nullable=False)  # last-known flatrate provider ids
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("movie_id", "region", name="uq_snapshot_movie_region"),
+    )
+
 class MovieEmbedding(Base):
     __tablename__ = "movie_embeddings"
     __table_args__ = (

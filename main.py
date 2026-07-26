@@ -4,7 +4,8 @@ import os
 import json
 import urllib.parse
 import re
-from fastapi import FastAPI, HTTPException, Depends, Query, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, Query, BackgroundTasks, Header
+from collections import defaultdict
 from datetime import date
 from typing import List, Optional, Any, Dict
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,7 +15,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, HttpUrl, Field
 from datetime import datetime, timedelta
 from auth import get_current_user, get_optional_user
-from database import Watchlist, User, ChatThread, Reaction, UserSubscription, RecommendationCache # Add the new tables
+from database import Watchlist, User, ChatThread, Reaction, UserSubscription, RecommendationCache, Notification, AvailabilitySnapshot # Add the new tables
 from models import WatchlistRequest, WatchlistResponse, ReactionRequest, SubscriptionRequest, AskRequest # Add the new models
 from fastapi import Request
 import httpx
@@ -22,7 +23,7 @@ import httpx
 # --- Database Imports ---
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import delete
+from sqlalchemy import delete, update
 from database import get_db, MovieCache, SearchHistory, init_db, MovieEmbedding, ChatMessage, AsyncSessionLocal
 from contextlib import asynccontextmanager
 from ai_services import generate_embedding, similarity_search_movies, stream_cinematic_reply, generate_why, answer_movie_question
@@ -389,6 +390,39 @@ async def _fetch_flatrate_batch(movie_ids: List[int], region: str) -> Dict[int, 
             *[one(client, mid) for mid in movie_ids], return_exceptions=True
         )
     out: Dict[int, set] = {}
+    for res in results:
+        if isinstance(res, tuple):
+            out[res[0]] = res[1]
+    return out
+
+
+async def _fetch_flatrate_detailed(movie_ids: List[int], region: str) -> Dict[int, Dict[int, str]]:
+    """Like _fetch_flatrate_batch, but returns {movie_id: {provider_id: provider_name}}."""
+    if not movie_ids:
+        return {}
+
+    async def one(client: httpx.AsyncClient, movie_id: int):
+        try:
+            r = await client.get(
+                f"{BASE_URL}/movie/{movie_id}/watch/providers",
+                headers=HEADERS,
+                params=AUTH_PARAMS,
+            )
+            if r.status_code == 200:
+                data = ((r.json() or {}).get("results") or {}).get(region) or {}
+                return movie_id, {
+                    p["provider_id"]: p.get("provider_name", "a service")
+                    for p in data.get("flatrate", [])
+                }
+        except httpx.HTTPError:
+            pass
+        return movie_id, {}
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        results = await asyncio.gather(
+            *[one(client, mid) for mid in movie_ids], return_exceptions=True
+        )
+    out: Dict[int, Dict[int, str]] = {}
     for res in results:
         if isinstance(res, tuple):
             out[res[0]] = res[1]
@@ -1419,6 +1453,152 @@ async def get_recommendations(
         db.add(RecommendationCache(user_id=user_id, rec_date=cache_key, data=payload))
     await db.commit()
     return payload
+
+# --- Notifications & "now streaming" availability checks ---
+@app.get("/api/v1/user/notifications")
+async def get_notifications(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Notification)
+        .where(Notification.user_id == user_id)
+        .order_by(Notification.created_at.desc())
+        .limit(50)
+    )
+    items = result.scalars().all()
+    return {
+        "unread": sum(1 for n in items if not n.is_read),
+        "items": [
+            {
+                "id": n.id,
+                "title": n.title,
+                "body": n.body,
+                "movie_id": n.movie_id,
+                "is_read": bool(n.is_read),
+                "created_at": n.created_at.isoformat() if n.created_at else None,
+            }
+            for n in items
+        ],
+    }
+
+@app.post("/api/v1/user/notifications/read")
+async def mark_notifications_read(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    await db.execute(
+        update(Notification)
+        .where(Notification.user_id == user_id, Notification.is_read == 0)
+        .values(is_read=1)
+    )
+    await db.commit()
+    return {"message": "Notifications marked read"}
+
+@app.post("/api/v1/internal/check-availability")
+async def check_availability(
+    x_cron_secret: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Triggered on a schedule (e.g. GitHub Actions). Diffs each user's watchlist
+    movies against last-known streaming availability and notifies when one lands
+    on a service they subscribe to."""
+    secret = os.getenv("CRON_SECRET", "")
+    if not secret or x_cron_secret != secret:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    wl = (
+        await db.execute(
+            select(Watchlist.user_id, Watchlist.movie_id).where(Watchlist.status == "WATCHLIST")
+        )
+    ).all()
+    subs = (
+        await db.execute(
+            select(UserSubscription.user_id, UserSubscription.provider_id, UserSubscription.region)
+        )
+    ).all()
+
+    user_watchlist: Dict[str, set] = defaultdict(set)
+    movie_users: Dict[int, set] = defaultdict(set)
+    for uid, mid in wl:
+        user_watchlist[uid].add(mid)
+        movie_users[mid].add(uid)
+
+    user_subs: Dict[str, Dict[str, set]] = defaultdict(lambda: defaultdict(set))
+    for uid, pid, region in subs:
+        user_subs[uid][(region or "").upper()].add(pid)
+
+    # Only check movies for users who actually have subscriptions.
+    region_movies: Dict[str, set] = defaultdict(set)
+    for uid, movies in user_watchlist.items():
+        for region in user_subs.get(uid, {}):
+            region_movies[region].update(movies)
+
+    if not region_movies:
+        return {"checked": 0, "notifications": 0}
+
+    checked = 0
+    notifications_created = 0
+
+    for region, movie_id_set in region_movies.items():
+        movie_ids = list(movie_id_set)
+        checked += len(movie_ids)
+        current = await _fetch_flatrate_detailed(movie_ids, region)
+
+        snap_rows = (
+            await db.execute(
+                select(AvailabilitySnapshot).where(
+                    AvailabilitySnapshot.region == region,
+                    AvailabilitySnapshot.movie_id.in_(movie_ids),
+                )
+            )
+        ).scalars().all()
+        snap_by_movie = {s.movie_id: s for s in snap_rows}
+
+        title_rows = (
+            await db.execute(
+                select(MovieEmbedding.movie_id, MovieEmbedding.title).where(
+                    MovieEmbedding.movie_id.in_(movie_ids)
+                )
+            )
+        ).all()
+        title_by_id = {mid: t for mid, t in title_rows}
+
+        for mid in movie_ids:
+            cur_map = current.get(mid, {})
+            cur_ids = set(cur_map.keys())
+            snap = snap_by_movie.get(mid)
+
+            if snap is None:
+                # First time we've seen this movie/region — record, don't alert.
+                db.add(AvailabilitySnapshot(movie_id=mid, region=region, provider_ids=list(cur_ids)))
+                continue
+
+            prev_ids = set(snap.provider_ids or [])
+            newly = cur_ids - prev_ids
+            snap.provider_ids = list(cur_ids)
+            snap.updated_at = datetime.utcnow()
+            if not newly:
+                continue
+
+            for uid in movie_users.get(mid, set()):
+                matched = newly & user_subs.get(uid, {}).get(region, set())
+                if not matched:
+                    continue
+                provider_name = cur_map.get(next(iter(matched)), "a streaming service")
+                title = title_by_id.get(mid) or "A movie on your watchlist"
+                db.add(
+                    Notification(
+                        user_id=uid,
+                        title=title,
+                        body=f"Now streaming on {provider_name}",
+                        movie_id=mid,
+                    )
+                )
+                notifications_created += 1
+
+    await db.commit()
+    return {"checked": checked, "notifications": notifications_created}
 
 @app.get("/api/v1/history")
 async def get_search_history(
