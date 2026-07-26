@@ -3,7 +3,6 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { Search, X } from 'lucide-react'
 import { fetchNowPlaying, fetchSearchMovies, fetchCountries, fetchLanguages } from '../api'
 import { useRegionStore } from '../store/useAppStore'
-import { useLocationDetect } from '../hooks/useLocation'
 import { useIntersectionObserver } from '../hooks/useInfiniteScroll'
 import MovieCard from '../components/movie/MovieCard'
 import { SkeletonGrid } from '../components/ui/SkeletonCard'
@@ -20,8 +19,6 @@ function getSectionTitle({ countryName, languageName, searchQuery }) {
 }
 
 export default function Home() {
-  useLocationDetect()
-
   const { currentRegion, currentLang, setRegion, setLang } = useRegionStore()
 
   const [searchInput, setSearchInput] = useState('')
